@@ -7,8 +7,6 @@
 # !!!You must update starmade.cfg for the Daemon to work on your setup!!!
 # The daemon should be ran from the intended user as it detects and writes the current username to the configuration file
 
-#For development purposes update check can be turned off
-UPDATECHECK=NO
 # Set the basics paths for the Daemon automatically.  This can be changed if needed for alternate configurations
 # This sets the path of the script to the actual script directory.  This is some magic I found on stackoverflow http://stackoverflow.com/questions/4774054/reliable-way-for-a-bash-script-to-get-the-full-path-to-itself	
 DAEMONPATH=$(cd `dirname "${BASH_SOURCE[0]}"` && pwd)/`basename "${BASH_SOURCE[0]}"`
@@ -31,25 +29,7 @@ sm_config() {
 # Check to see if the config file is in place, if it is then see if an update is needed.  If it does not exist create it and other needed files and directories.
 if [ -e $CONFIGPATH ]
 then
-	if [ "$UPDATECHECK" = "YES" ]
-	then
-#		echo "Checking HASH to see if Daemon was updated"
-# Grab the hash from the config file and compare it tot he Daemon's hash to see if the Daemon has been updated	
-		CONFIGHASH=$(grep HASH $CONFIGPATH | cut -d= -f2 | tr -d ' ')
-		if [ "$CONFIGHASH" = "$CURRENTHASH" ]
-		then
-#			echo "No update detected, Reading from Source $CONFIGPATH"
-			source $CONFIGPATH
-		else
-			echo "Changes detected updating config files"
-# Source read from another file.  In this case it is the config file containing all the settings for the Daemon
-			source $CONFIGPATH
-			update_daemon
-		fi
-	else
-#		echo "Update check is turned off reading source from config file"
-		source $CONFIGPATH
-	fi
+	source $CONFIGPATH
 else
 # If no config file present set the username temporarily to the current user
 	USERNAME=$(whoami)
@@ -574,45 +554,10 @@ parselog(){
 				log_chatcommands $@ &
 				log_chatlogging $@ &
 				;;
-			*"$SEARCHCHANGE"*) 
-#				echo "Change detected"
-#				echo $@
-				log_sectorchange $@ &
-				;;
-			*"$SEARCHBUY"*) 
-#				echo "Buy detected"
-#				echo $@
-				log_shipbuy $@ &
-				;;
-			*"$SEARCHBOARD"*) 
-#				echo "Board detected"
-#				echo $@
-				log_boarding $@ &
-				;;
-			*"$SEARCHDOCK"*) 
-#				echo "Docking detected"
-#				echo $@
-				log_docking docking $@ &
-				;;
-			*"$SEARCHUNDOCK"*) 
-#				echo "Undocking detected"
-#				echo $@
-				log_docking undocking $@ &
-				;;
 			*"$SEARCHADMIN"*) 
 #				echo "Admin detected"
 #				echo $@
 				log_admincommand $@ &
-				;;
-			*"$SEARCHKILL"*) 
-#				echo "Kill detected"
-#				echo $@
-				log_kill $@ &
-				;;
-			*"$SEARCHDESTROY"*) 
-#				echo "Destroy detected"
-#				echo $@
-				log_destroystring $@ &
 				;;
 			*"$SEARCHINIT"*) 
 #				echo "Init detected"
@@ -831,13 +776,7 @@ then
 #		echo Doesnt exist
 		as_user "screen -p 0 -S $SCREENID -X stuff $'/pm ${COMMANDANDPARAMETERS[1]} Unrecognized command. Please try again or use !HELP\n'"
 		fi
-	else
-#		If they didnt use a command, then run caps_prevention
-		caps_prevention $PLAYERCHATID $(echo $CHATGREP | cut -d" " -f4- | tr -d " ") &
 	fi
-#	run spam_prevention and swear_prevention if it was a valid chat message
-	spam_prevention $PLAYERCHATID &
-	swear_prevention $PLAYERCHATID $(echo $CHATGREP | cut -d" " -f4-) &
 fi
 }
 log_admincommand() { 
@@ -885,74 +824,12 @@ log_initstring() {
 INITPLAYER=$(echo $@ | cut -d\[ -f3 | cut -d\; -f1 | tr -d " ")
 sleep 0.5
 log_playerinfo $INITPLAYER
-if [ -e $MAILFILE/$INITPLAYER ]
-then
-	UNREADCOUNT=$(grep "UnreadMail" $MAILFILE/$INITPLAYER | cut -d" " -f2)
-else
-	echo "UnreadMail: 1 CurrentMailId: 1" >> $MAILFILE/$INITPLAYER
-	echo "MessageID: 0 Unread: Yes Sender: MailBoxPro Time: $(date +%s) Message: Welcome to the mail box $INITPLAYER! Type !MAIL HELP to see how to use the mail box!" >> $MAILFILE/$INITPLAYER
-	UNREADCOUNT=1
-fi
-FACTION=$(grep "PlayerFaction" $PLAYERFILE/$INITPLAYER | cut -d= -f2)
-if [ -e $MAILFILE/FAC@$FACTION ]
-then
-	FACUNREADCOUNT=$(grep "UnreadMail" $MAILFILE/FAC@$FACTION | cut -d" " -f2)
-else
-	echo "UnreadMail: 1 CurrentMailId: 1" >> $MAILFILE/FAC@$FACTION
-	echo "MessageID: 0 Unread: Yes Sender: MailBoxPro Time: $(date +%s) Message: Welcome to the mail box faction $FACTION! Type !FMAIL HELP to see how to use the mail box!" >> $MAILFILE/FAC@$FACTION
-	FACUNREADCOUNT=1
-fi
-#checks if the player has any unread mail
-if [ $UNREADCOUNT -gt "0" ]
-then
-	as_user "screen -p 0 -S $SCREENID -X stuff $'/pm $INITPLAYER You have $UNREADCOUNT unread mail. Type !MAIL LIST Unread to see all unread mail.\n'"
-fi
-if [ $FACUNREADCOUNT -gt "0" ]
-then
-	as_user "screen -p 0 -S $SCREENID -X stuff $'/pm $INITPLAYER Your faction has $FACUNREADCOUNT unread mail. Type !FMAIL LIST Unread to see all unread mail.\n'"
-fi
 if grep -q "JustLoggedIn=Yes" $PLAYERFILE/$INITPLAYER 
 then
 	LOGINMESSAGE="Welcome to the server $INITPLAYER! Type !HELP for chat commands"
 	# A chat message that is displayed whenever a player logs in
 	as_user "screen -p 0 -S $SCREENID -X stuff $'/pm $INITPLAYER $LOGINMESSAGE\n'"
 	as_user "sed -i 's/JustLoggedIn=.*/JustLoggedIn=No/g' $PLAYERFILE/$INITPLAYER"
-fi
-}
-log_docking(){
-if [ $1 = "docking" ]
-then
-	DOCKSTRING=${@:2}
-	DOCKSHIP=$(echo $DOCKSTRING | cut -d"[" -f3 | cut -d"]" -f1)
-#	echo $DOCKSHIP
-	if $(echo $DOCKSTRING | grep -q -- "ON Ship\[")
-	then
-		DOCKENTITY=$(echo $DOCKSTRING | cut -d"[" -f4 | cut -d"]" -f1)"@ship"
-	else
-		DOCKENTITY=$(echo $DOCKSTRING | cut -d"[" -f4 | cut -d"]" -f1 | cut -d"_" -f3- | cut -d"(" -f1)"@station"
-	fi
-#	echo $DOCKENTITY
-	if (grep "{$DOCKSHIP}" $SHIPLOG >/dev/null)
-	then
-		SHIPDATA=($(grep "{$DOCKSHIP}" $SHIPLOG))
-		SHIPDATA[2]="<$DOCKENTITY>"
-		as_user "sed -i 's/{$DOCKSHIP} .*/$(echo ${SHIPDATA[@]})/g' $SHIPLOG"
-	else
-		as_user "echo {$DOCKSHIP} \[~Unknown\] \<$DOCKENTITY\> \(~Unknown\) >> $SHIPLOG" 
-	fi
-elif [ $1 = "undocking" ]
-then
-	DOCKSTRING=${@:2}
-	DOCKSHIP=$(echo $DOCKSTRING | cut -d"[" -f3 | cut -d"]" -f1)
-#	echo $DOCKSHIP
-	if (grep "{$DOCKSHIP}" $SHIPLOG >/dev/null)
-	then
-		SHIPDATA=($(grep "{$DOCKSHIP}" $SHIPLOG))
-		SHIPDATA[2]="<~none>"
-		as_user "sed -i 's/{$DOCKSHIP} .*/$(echo ${SHIPDATA[@]})/g' $SHIPLOG"
-	else
-		as_user "echo {$DOCKSHIP} \[~Unknown\] \<~none\> \(~Unknown\) >> $SHIPLOG"
-	fi
 fi
 }
 
@@ -1065,22 +942,8 @@ FUNCTIONEXISTS=$?
 write_factionfile() { 
 CREATEFACTION="cat > $FACTIONFILE/$1 <<_EOF_
 CreditsInBank=0
-OwnedSectors=0
-TrespassMessage=0
-TaxPercent=0
 _EOF_"
 as_user "$CREATEFACTION"
-}
-write_barredwords() {
-CREATEBARRED="cat > $BARREDWORDS <<_EOF_
-fuck
-shit
-crap
-dick
-ffs
-asshole
-_EOF_"
-as_user "$CREATEBARRED"
 }
 write_configpath() {
 CONFIGCREATE="cat > $CONFIGPATH <<_EOF_
@@ -1115,60 +978,13 @@ CHATLOG=$STARTERPATH/logs/chat.log #The file that contains a record of all chat 
 PLAYERFILE=$STARTERPATH/playerfiles #The directory that contains all the individual player files which store player information
 ADMINLOG=$STARTERPATH/logs/admin.log #The file with a record of all admin commands issued
 GUESTBOOK=$STARTERPATH/logs/guestbook.log #The file with a record of all the logouts on the server
-STATIONLOG=$STARTERPATH/logs/station.log #The file that contains all of the stations on the server
-PLANETLOG=$STARTERPATH/logs/planet.log #The file that contains all of the planets on the server
-SHIPBUYLOG=$STARTERPATH/logs/shipbuy.log #The file that contains all the ships spawned on the server
 BANKLOG=$STARTERPATH/logs/bank.log #The file that contains all transactions made on the server
 ONLINELOG=$STARTERPATH/logs/online.log #The file that contains the list of currently online players
 TIPFILE=$STARTERPATH/logs/tips.txt #The file that contains random tips that will be told to players
 FACTIONFILE=$STARTERPATH/factionfiles #The folder that contains individual faction files
-BARREDWORDS=$STARTERPATH/logs/barredwords.log #The file that contains all blocked words (for use with SwearPrevention)
-SECTORFILE=$STARTERPATH/logs/sectordata.log #The file that contains a list of all owned sectors, and their stats
-PROTECTEDSECTORS=$STARTERPATH/logs/protected.log #Contains a list of all protected sectors (only works with custom spawning)
-#-------------------------Chat Settings-------------------------------------------------------------------
-SPAMPREVENTION=Yes # Turns on or off the SpamPrevention system (Yes/No)
-SPAMLIMIT=5 # The number of messages that can be sent within the $SPAMTIMER before a player will be warned
-SPAMTIMER=10 # The time taken for the message counter to reduce by one after sending a chat message
-SPAMALLOWANCE=2 # The number of messages allowed between receiving the warning and being kicked
-SPAMKICKLIMIT=2 # The number of kicks from the server before the player is banned (Set to really high to turn off)
-SWEARPREVENTION=Yes # Turns on or off the SwearPrevention system (Yes/No)
-SWEARLIMIT=2 # The number of swear words allowed within $SWEARTIMER seconds
-SWEARTIMER=60 # The time taken for the swear counter to reduce by one after swearing
-SWEARKICKLIMIT=2 # The number of kicks from the server before the player is banned (Set to really high to turn off)
-CAPSPREVENTION=Yes # Turns on or off the CapsPrevention system (Yes/No)
-CAPSLIMIT=5 # The number of messages that can be sent that exceed the $CAPSPERCENT limit
-CAPSTIMER=10 # The time taken for the caps counter to reduce by one after sending a message with too many caps
-CAPSKICKLIMIT=4 # The number of kicks a player can recieve for Caps before theyre banned
-CAPSPERCENT=30 # The percentage of letters in a chat message that can be caps
-#-------------------------Custom Spawns-------------------------------------------------------------------
-CUSTOMSPAWNING=Yes #Determines if the server will use a custom spawning method, utilising player movement
-PIRATENAMES=('Isanth-VI') #The blueprint names of all pirate ships on the server
-LIMITCHANCE=50 #The % chance of pirates spawning per sector change at maximum
-SPAWNLIMIT=9 #The maximum number of pirates inside a wave
-PIRATECOOLTIMER=300 #The minimum time in seconds between each spawn
-#-------------------------Sector ownership-------------------------------------------------------------------
-BEACONNAME='Beacon' #The blueprint name of the sector beacon station (select a station and use /save)
-SECTORCOST=10000000 #The base cost to buy a sector (0 boardering sectors equals 100% cost, 6 boardering sectors equals 50% cost)
-DAILYFEES=700000 #The amount of money a player has to pay each day to maintain the sectors (intentionally larger than baseincome)
-BASEINCOME=500000 #The base amount of income from a sector per day (0 boardering sectors equals baseincome, 6 boardering sectors equals baseincome x 4)
-BEACONCREDITLIMIT=10000000 #The limit of credits each beacon can store
-SECTORREFUND=90 #The percentage of credits back from selling a sector
 #------------------------Game settings----------------------------------------------------------------------------
-GATECOST=50 #Number of voting points needed to spawn a gate
-#Gate level stats. GATETEIR[LEVEL]equals\"vote-cost warm-up-time cool-down-time\" Can be expanded following the same format infinitely
-GATETEIR[1]=\"0 15 180\"
-GATETEIR[2]=\"2 13 160\"
-GATETEIR[3]=\"3 11 140\"
-GATETEIR[4]=\"5 9 120\"
-GATETEIR[5]=\"8 7 110\"
-GATETEIR[6]=\"10 5 90\"
-GATETEIR[7]=\"15 5 80\"
-GATETEIR[8]=\"20 5 70\"
-GATETEIR[9]=\"30 5 60\"
-GATEREFUND=90 #percentage of the cost of the gate that players get back
 VOTECHECKDELAY=10 #The time in seconds between each check of starmade-servers.org
 CREDITSPERVOTE=1000000 # The number of credits a player gets per voting point.
-FOLDLIMIT=900 #Due to the way bash square roots numbers, this is the square of the distance limit to be more accurate with distances
 UNIVERSEBOARDER=YES #Turn on and off the universe boarder (YES/NO)
 UNIVERSECENTER=\"2,2,2\" #Set the center of the universe boarder
 UNIVERSERADIUS=50 #Set the radius of the universe boarder around 
@@ -1201,11 +1017,11 @@ as_user "$PLAYERCREATE"
 }
 write_rankcommands() {
 CREATERANK="cat > $RANKCOMMANDS <<_EOF_
-Ensign MAIL POSTBOUNTY LISTBOUNTY COLLECTBOUNTY FOLD ADDJUMP JUMPLIST JUMP UPGRADEJUMP DESTROYJUMP DEPOSIT WITHDRAW TRANSFER BALANCE RANKME RANKLIST RANKCOMMAND PLAYERWHITELIST VOTEBALANCE PING HELP CORE SEARCH CLEAR LISTWHITE BUYSECTOR SECTORLIST BEACONWITHDRAW BEACONBALANCE BEACONSELL FMAIL FDEPOSIT FWITHDRAW FBALANCE
-Lieutenant MAIL POSTBOUNTY LISTBOUNTY COLLECTBOUNTY FOLD ADDJUMP JUMPLIST JUMP UPGRADEJUMP DESTROYJUMP DEPOSIT WITHDRAW TRANSFER BALANCE RANKME RANKLIST RANKCOMMAND PLAYERWHITELIST VOTEBALANCE PING HELP CORE SEARCH CLEAR LISTWHITE WHITEADD KICK BUYSECTOR SECTORLIST BEACONWITHDRAW BEACONBALANCE BEACONSELL FMAIL FDEPOSIT FWITHDRAW FBALANCE
-Commander MAIL POSTBOUNTY LISTBOUNTY COLLECTBOUNTY FOLD ADDJUMP JUMPLIST JUMP UPGRADEJUMP DESTROYJUMP DEPOSIT WITHDRAW TRANSFER BALANCE RANKME RANKLIST RANKCOMMAND PLAYERWHITELIST VOTEBALANCE PING HELP CORE SEARCH CLEAR LISTWHITE WHITEADD KICK BANPLAYER UNBAN BUYSECTOR SECTORLIST BEACONWITHDRAW BEACONBALANCE BEACONSELL FMAIL FDEPOSIT FWITHDRAW FBALANCE
-Captain MAIL POSTBOUNTY LISTBOUNTY COLLECTBOUNTY FOLD ADDJUMP JUMPLIST JUMP UPGRADEJUMP DESTROYJUMP DEPOSIT WITHDRAW TRANSFER BALANCE RANKME RANKLIST RANKCOMMAND PLAYERWHITELIST VOTEBALANCE PING HELP CORE SEARCH CLEAR LISTWHITE WHITEADD KICK BANPLAYER UNBAN RESTART DESPAWN KILL BANHAMMER TELEPORT PROTECT UNPROTECT SPAWNSTOP SPAWNSTART BUYSECTOR SECTORLIST BEACONWITHDRAW BEACONBALANCE BEACONSELL FMAIL FDEPOSIT FWITHDRAW FBALANCE
-Admiral MAIL POSTBOUNTY LISTBOUNTY COLLECTBOUNTY FOLD ADDJUMP JUMPLIST JUMP UPGRADEJUMP DESTROYJUMP DEPOSIT WITHDRAW TRANSFER BALANCE RANKME RANKLIST RANKCOMMAND PLAYERWHITELIST VOTEBALANCE PING HELP CORE SEARCH CLEAR LISTWHITE MAILALL ADMINADDJUMP ADMINDELETEJUMP RANKSET RANKUSER BANHAMMER KILL WHITEADD BANPLAYER UNBAN SHUTDOWN RESTART CREDITS IMPORT EXPORT DESPAWN LOADSHIP GIVE GIVESET KICK GODON GODOFF INVISION INVISIOFF TELEPORT PROTECT UNPROTECT SPAWNSTOP SPAWNSTART MYDETAILS ADMINCOOLDOWN ADMINREADFILE THREADDUMP GIVESET GIVEMETA BUYSECTOR SECTORLIST BEACONWITHDRAW BEACONBALANCE BEACONSELL FMAIL FDEPOSIT FWITHDRAW FBALANCE
+Ensign DEPOSIT WITHDRAW TRANSFER BALANCE RANKME RANKLIST RANKCOMMAND VOTEBALANCE PING HELP CORE CLEAR FDEPOSIT FWITHDRAW FBALANCE
+Lieutenant DEPOSIT WITHDRAW TRANSFER BALANCE RANKME RANKLIST RANKCOMMAND VOTEBALANCE PING HELP CORE CLEAR FDEPOSIT FWITHDRAW FBALANCE
+Commander DEPOSIT WITHDRAW TRANSFER BALANCE RANKME RANKLIST RANKCOMMAND VOTEBALANCE PING HELP CORE CLEAR FDEPOSIT FWITHDRAW FBALANCE
+Captain DEPOSIT WITHDRAW TRANSFER BALANCE RANKME RANKLIST RANKCOMMAND VOTEBALANCE PING HELP CORE CLEAR FDEPOSIT FWITHDRAW FBALANCE
+Admiral DEPOSIT WITHDRAW TRANSFER BALANCE RANKME RANKLIST RANKCOMMAND VOTEBALANCE PING HELP CORE CLEAR FDEPOSIT FWITHDRAW FBALANCE
 Admin -ALL-
 _EOF_"
 as_user "$CREATERANK"
@@ -1257,12 +1073,6 @@ create_rankscommands(){
 if [ ! -e $RANKCOMMANDS ]
 then
 	write_rankcommands
-fi
-}
-create_barredwords(){
-if [ ! -e $BARREDWORDS ]
-then
-	write_barredwords
 fi
 }
 update_file() {
@@ -1336,31 +1146,6 @@ $WRITESTRING
 EOF"
 let NEWARRAY++
 done
-}
-update_daemon() {
-update_file write_configpath
-update_file write_barredwords
-update_file write_tipfile
-update_file write_rankcommands
-PUPDATE=( $(ls $PLAYERFILE) )
-PARRAY=0
-while [ -n "${PUPDATE[$PARRAY]+set}" ] 
-do
-update_file write_playerfile ${PUPDATE[$PARRAY]}
-#echo "${PUPDATE[$PARRAY]} file is being updated"
-let PARRAY++
-done
-FUPDATE=( $(ls $FACTIONFILE) )
-FARRAY=0
-while [ -n "${FUPDATE[$FARRAY]+set}" ] 
-do
-update_file write_factionfile ${FUPDATE[$FARRAY]}
-#echo "${FUPDATE[$FARRAY]} file is being updated"
-let FARRAY++
-done
-CURRENTHASH=$(md5sum $DAEMONPATH |  cut -d" " -f1 | tr -d ' ')
-# Update the HASH
-as_user "sed -i 's/HASH=.*/HASH=$CURRENTHASH/g' $CONFIGPATH"
 }
 
 #---------------------------Chat Commands---------------------------------------------
@@ -2013,122 +1798,87 @@ sm_config
 
 # End of regular Functions and the beginning of alias for commands, custom functions, and finally functions that use arguments. 
 case "$1" in
-start)
-	sm_start
+	start)
+		sm_start
 	;;
-status)
-	sm_status
+	status)
+		sm_status
 	;;
-detect)
-	sm_detect
+	detect)
+		sm_detect
 	;;
-log)
-	sm_log
+	log)
+		sm_log
 	;;
-screenlog)
-	sm_screenlog
+	screenlog)
+		sm_screenlog
 	;;
-stop)
-	sm_stop
-	screen -S $SCREENLOG -X quit
-	echo "Stopping logging"
+	stop)
+		sm_stop
+		screen -S $SCREENLOG -X quit
+		echo "Stopping logging"
 	;;
-ebrake)
-	sm_ebrake
+	ebrake)
+		sm_ebrake
 	;;
-upgrade)
-	sm_upgrade
+	upgrade)
+		sm_upgrade
 	;;
-cronstop)
-	sm_cronstop
+	cronstop)
+		sm_cronstop
 	;;
-cronrestore)
-	sm_cronrestore
+	cronrestore)
+		sm_cronrestore
 	;;
-cronbackup)
-	sm_cronbackup
+	cronbackup)
+		sm_cronbackup
 	;;
-check)
-	sm_check
+	backup)
+		sm_backup
 	;;
-precheck)
-	sm_precheck
+	restore)
+		sm_restore $@
 	;;
-install)
-	sm_install
+	dump)
+		sm_dump $@
 	;;
-destroy)
-	sm_destroy
+	box)
+		sm_box $@
 	;;
-backup)
-	sm_backup
+	help)
+		sm_help
 	;;
-smsay)
-	sm_say $@
+	restart)
+		sm_stop
+		screen -S $SCREENLOG -X quit
+		echo "Stopping logging"
+		sm_start
 	;;
-smdo)
-	sm_do $@
+	backupstar)
+		sm_cronstop
+		sm_stop
+		sm_backup
+		sm_start
+		sm_cronrestore
 	;;
-setplayermax)
-	sm_setplayermax $@
+	upgradestar)
+		sm_cronstop
+		sm_stop
+		sm_upgrade
+		sm_start
+		sm_cronrestore
 	;;
-restore)
-	sm_restore $@
+	debug) 
+		echo ${@:2}
+		parselog ${@:2}
 	;;
-ban)
-	sm_ban $@
+	*)
+		echo "Doomsider's and Titanmasher's Starmade Daemon (DSD) V.17"
+		echo "Usage: starmaded.sh {help|start|stop|ebrake|restore|status|restart|upgrade|upgradestar|cronstop|cronbackup|cronrestore|backup|backupstar|detect|log|screenlog|dump|box}"
+		#******************************************************************************
+		exit 1
 	;;
-dump)
-	sm_dump $@
-	;;
-box)
-	sm_box $@
-	;;
-help)
-	sm_help
-	;;
-reinstall)
-	sm_cronstop
-	sm_stop
-	sm_destroy
-	sm_install
-	sm_cronrestore
-	;;
-restart)
-	sm_stop
-	screen -S $SCREENLOG -X quit
-	echo "Stopping logging"
-	sm_start
-	;;
-backupstar)
-	sm_cronstop
-	sm_stop
-	sm_backup
-	sm_start
-	sm_cronrestore
-	;;
-upgradestar)
-	sm_cronstop
-	sm_stop
-	sm_upgrade
-	sm_start
-	sm_cronrestore
-	;;
-updatefiles)
-	update_daemon
-	;;
-debug) 
-	echo ${@:2}
-	parselog ${@:2}
-	;;
-*)
-echo "Doomsider's and Titanmasher's Starmade Daemon (DSD) V.17"
-echo "Usage: starmaded.sh {help|updatefiles|start|stop|ebrake|install|reinstall|restore|status|destroy|restart|upgrade|upgradestar|smdo|smsay|cronstop|cronbackup|cronrestore|backup|backupstar|setplayermax|detect|log|screenlog|check|precheck|ban|dump|box}"
-#******************************************************************************
-exit 1
-;;
 esac
 exit 0
-# Notes:  When executing smdo and smsay enclose in "" and escape any special characters
-# All chat commands require a ! in front of them and the commands are always in caps
 
+### EOF ###
