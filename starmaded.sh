@@ -430,14 +430,7 @@ create_rankscommands
 		SEARCHREMOVE="[SERVER][DISCONNECT] Client 'RegisteredClient:"
 		SEARCHCHAT="[CHANNELROUTER] RECEIVED MESSAGE ON Server(0): [CHAT]"
 #		SEARCHCHAT="[CHAT]"
-		SEARCHCHANGE="has players attached. Doing Sector Change for PlS"
-		SEARCHBUY="[BLUEPRINT][BUY]"
-		SEARCHBOARD="[CONTROLLER][ADD-UNIT]"
-		SEARCHDOCK="NOW REQUESTING DOCK FROM"
-		SEARCHUNDOCK="NOW UNDOCKING:"
 		SEARCHADMIN="[ADMIN COMMAND]"
-		SEARCHKILL="Announcing kill:"
-		SEARCHDESTROY="PERMANENTLY DELETING ENTITY:"
 		SEARCHINIT="SPAWNING NEW CHARACTER FOR PlS"
 # Linenumber is set to zero and the a while loop runs through every present array in Linestring	
 		LINENUMBER=0
@@ -464,45 +457,10 @@ create_rankscommands
 				log_chatcommands $CURRENTSTRING &
 				log_chatlogging $CURRENTSTRING &
 				;;
-			*"$SEARCHCHANGE"*) 
-#				echo "Change detected"
-#				echo $CURRENTSTRING
-				log_sectorchange $CURRENTSTRING &
-				;;
-			*"$SEARCHBUY"*) 
-#				echo "Buy detected"
-#				echo $CURRENTSTRING
-				log_shipbuy $CURRENTSTRING &
-				;;
-			*"$SEARCHBOARD"*) 
-#				echo "Board detected"
-#				echo $CURRENTSTRING
-				log_boarding $CURRENTSTRING &
-				;;
-			*"$SEARCHDOCK"*) 
-#				echo "Docking detected"
-#				echo $CURRENTSTRING
-				log_docking docking $CURRENTSTRING &
-				;;
-			*"$SEARCHUNDOCK"*) 
-#				echo "Undocking detected"
-#				echo $CURRENTSTRING
-				log_docking undocking $CURRENTSTRING &
-				;;
 			*"$SEARCHADMIN"*) 
 #				echo "Admin detected"
 #				echo $CURRENTSTRING
 				log_admincommand $CURRENTSTRING &
-				;;
-			*"$SEARCHKILL"*) 
-#				echo "Kill detected"
-#				echo $CURRENTSTRING
-				log_kill $CURRENTSTRING &
-				;;
-			*"$SEARCHDESTROY"*) 
-#				echo "Destroy detected"
-#				echo $CURRENTSTRING
-				log_destroystring $CURRENTSTRING &
 				;;
 			*"$SEARCHINIT"*) 
 #				echo "Init detected"
@@ -696,17 +654,17 @@ log_chatcommands() {
 CHATGREP=$@
 if [[ ! $CHATGREP == *WARNING* ]] && [[ ! $CHATGREP == *object* ]]
 then
-	echo $CHATGREP
+#	echo $CHATGREP
 #	COMMAND=$(echo $CHATGREP | cut -d" " -f4)
 
 	CUTSTRING=${CHATGREP#*=}
 	PLAYERCHATID=${CUTSTRING%%]*}
-	echo $PLAYERCHATID
+#	echo $PLAYERCHATID
 	CUTSTRING=${CUTSTRING#*=}
 	CUTSTRING=${CUTSTRING#*=}
 	CUTSTRING=${CUTSTRING#*=}
 	COMMAND=${CUTSTRING%%]*}
-	echo $COMMAND
+#	echo $COMMAND
 
 #	if [[ "$CHATGREP" =~ "[SERVER][CHAT][WISPER]" ]]
 #	then
