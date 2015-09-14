@@ -15,11 +15,12 @@ CONFIGPATH="$(echo $DAEMONPATH | cut -d"." -f1).cfg"
 # Set the starter path to the correct directory.  rev here is used to make the string backwards so that it can be cut at the last forward slash 
 STARTERPATH=$(echo $DAEMONPATH | rev | cut -d"/" -f2- | rev)
 # Since this is a Daemon it can be called on from anywhere from just about anything.  This function below ensures the Daemon is using the proper user for the correct privileges
+ME=$(whoami)
 as_user() {
-if [ "$ME" == "$USERNAME" ] ; then
-bash -c "$1"
+if [ "$ME" == "root" ] ; then
+	echo "Not running as root. Aborting..."
 else
-su - $USERNAME -c "$1"
+	bash -c "$1"
 fi
 }
 
@@ -906,7 +907,6 @@ CONFIGCREATE="cat > $CONFIGPATH <<_EOF_
 #  Logging is for turning on or off with a YES or a NO
 #  Daemon Path is only used if you are going to screen log
 #  Server key is for the rewards and voting function and is setup for http://starmade-servers.com/
-HASH=$CURRENTHASH
 SERVICE='StarMade.jar' #The name of the .jar file to be run
 USERNAME="$USERNAME" #Your login name
 BACKUP='/home/$USERNAME/starbackup' #The location where all backups created are saved
