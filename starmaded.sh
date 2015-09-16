@@ -395,10 +395,18 @@ create_rankscommands
 	mkdir -p $GATEWHITELIST
 # Create the playerfile folder if it doesnt exist
 	mkdir -p $PLAYERFILE
+	OLDCHARCOUNT=0
 # This while loop runs as long as starmade stays running    
 	while (ps aux | grep $SERVICE | grep -v grep | grep -v tee | grep port:$PORT >/dev/null)
 	do
 		sleep 0.1
+#First check if the byte-count changed, because wc -c ist over 50 times faster than wc -l
+		CHARCOUNT=$(wc -c /dev/shm/output.log | cut -d" " -f1)
+		if [ "$CHARCOUNT" -eq "$OLDCHARCOUNT" ]
+		then
+			continue
+		fi
+		OLDCHARCOUNT=$CHARCOUNT
 # Uses Cat to calculate the number of lines in the log file
 		NUMOFLINES=$(wc -l /dev/shm/output.log | cut -d" " -f1)
 # In case Linestart does not have a value give it an interger value of 1.  The prevents a startup error on the script.
@@ -1221,7 +1229,7 @@ function COMMAND_TRANSFER(){
 			as_user "screen -p 0 -S $SCREENID -X stuff $'/pm $1 GALACTIC BANK - Connecting to servers\n'"
 			BALANCECREDITS=$(grep CreditsInBank $PLAYERFILE/$1 | cut -d= -f2 | tr -d ' ')
 #			echo "Player transferring has $BALANCECREDITS in account"
-			if [ "$3" -lt "$BALANCECREDITS" ]
+			if [ "$3" -le "$BALANCECREDITS" ]
 			then
 				TRANSFERBALANCE=$(grep CreditsInBank $PLAYERFILE/$2 | cut -d= -f2 | tr -d ' ')
 #				echo "Player receiving has $TRANSFERBALANCE in his account"
