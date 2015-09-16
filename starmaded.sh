@@ -395,18 +395,18 @@ create_rankscommands
 	mkdir -p $GATEWHITELIST
 # Create the playerfile folder if it doesnt exist
 	mkdir -p $PLAYERFILE
-	OLDCHARCOUNT=0
+	OLDBYTECOUNT=0
 # This while loop runs as long as starmade stays running    
 	while (ps aux | grep $SERVICE | grep -v grep | grep -v tee | grep port:$PORT >/dev/null)
 	do
 		sleep 0.1
 #First check if the byte-count changed, because wc -c ist over 50 times faster than wc -l
-		CHARCOUNT=$(wc -c /dev/shm/output.log | cut -d" " -f1)
-		if [ "$CHARCOUNT" -eq "$OLDCHARCOUNT" ]
+		BYTECOUNT=$(wc -c /dev/shm/output.log | cut -d" " -f1)
+		if [ "$BYTECOUNT" -eq "$OLDBYTECOUNT" ]
 		then
 			continue
 		fi
-		OLDCHARCOUNT=$CHARCOUNT
+		OLDBYTECOUNT=$BYTECOUNT
 # Uses Cat to calculate the number of lines in the log file
 		NUMOFLINES=$(wc -l /dev/shm/output.log | cut -d" " -f1)
 # In case Linestart does not have a value give it an interger value of 1.  The prevents a startup error on the script.
