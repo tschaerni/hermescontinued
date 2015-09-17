@@ -793,54 +793,6 @@ fi
 
 #------------------------------Game mechanics-----------------------------------------
 
-universeboarder() { 
-if [ "$UNIVERSEBOARDER" = "YES" ]
-then
-	XULIMIT=$(($(echo $UNIVERSECENTER | cut -d"," -f1) + $UNIVERSERADIUS))
-	YULIMIT=$(($(echo $UNIVERSECENTER | cut -d"," -f2) + $UNIVERSERADIUS))
-	ZULIMIT=$(($(echo $UNIVERSECENTER | cut -d"," -f3) + $UNIVERSERADIUS))
-	XLLIMIT=$(($(echo $UNIVERSECENTER | cut -d"," -f1) - $UNIVERSERADIUS))
-	YLLIMIT=$(($(echo $UNIVERSECENTER | cut -d"," -f2) - $UNIVERSERADIUS))
-	ZLLIMIT=$(($(echo $UNIVERSECENTER | cut -d"," -f3) - $UNIVERSERADIUS))
-	XCOORD=$(echo $1 | cut -d"," -f1)
-	YCOORD=$(echo $1 | cut -d"," -f2)
-	ZCOORD=$(echo $1 | cut -d"," -f3)
-	if [ "$XCOORD" -ge "$XULIMIT" ] || [ "$YCOORD" -ge "$YULIMIT" ] || [ "$ZCOORD" -ge "$ZULIMIT" ] || [ "$XCOORD" -lt "$XLLIMIT" ] || [ "$YCOORD" -lt "$YLLIMIT" ] || [ "$ZCOORD" -lt "$ZLLIMIT" ]
-	then
-		if [ "$XCOORD" -ge "$XULIMIT" ]
-		then
-			NEWX=$(($XCOORD - $XULIMIT + $XLLIMIT))
-		elif [ "$XCOORD" -lt "$XLLIMIT" ]
-		then
-			NEWX=$(($XCOORD - $XLLIMIT + $XULIMIT))
-		else
-			NEWX=$XCOORD
-		fi
-		if [ "$YCOORD" -ge "$YULIMIT" ]
-		then
-			NEWY=$(($YCOORD - $YULIMIT + $YLLIMIT))
-		elif [ "$YCOORD" -lt "$YLLIMIT" ]
-		then
-			NEWY=$(($YCOORD - $YLLIMIT + $YULIMIT))
-		else
-			NEWY=$YCOORD
-		fi
-		if [ "$ZCOORD" -ge "$ZULIMIT" ]
-		then
-			NEWZ=$(($ZCOORD - $ZULIMIT + $ZLLIMIT))
-		elif [ "$ZCOORD" -lt "$ZLLIMIT" ]
-		then
-			NEWZ=$(($ZCOORD - $ZLLIMIT + $ZULIMIT))
-		else
-			NEWZ=$ZCOORD
-		fi
-		sleep 4
-		as_user "screen -p 0 -S $SCREENID -X stuff $'/pm $2 You have warped to the opposite side of the universe! It appears you cant go further out...\n'"
-		as_user "screen -p 0 -S $SCREENID -X stuff $'/change_sector_for $2 $NEWX $NEWY $NEWZ\n'"
-	fi
-fi
-	
-}
 randomhelptips(){
 create_tipfile
 while [ -e /proc/$SM_LOG_PID ]
@@ -942,9 +894,6 @@ FACTIONFILE=$STARTERPATH/factionfiles #The folder that contains individual facti
 #------------------------Game settings----------------------------------------------------------------------------
 VOTECHECKDELAY=10 #The time in seconds between each check of starmade-servers.org
 CREDITSPERVOTE=1000000 # The number of credits a player gets per voting point.
-UNIVERSEBOARDER=YES #Turn on and off the universe boarder (YES/NO)
-UNIVERSECENTER=\"2,2,2\" #Set the center of the universe boarder
-UNIVERSERADIUS=50 #Set the radius of the universe boarder around 
 TIPINTERVAL=600 #Number of seconds between each tip being shown
 STARTINGRANK=Ensign #The initial rank players recieve when they log in for the first time. Can be edited.
 _EOF_"
