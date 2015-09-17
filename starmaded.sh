@@ -1,16 +1,20 @@
 #!/bin/bash
-# Doomsider's and Titanmasher's Daemon Script for Starmade.  init.d script 7/10/13 based off of http://paste.boredomsoft.org/main.php/view/62107887
-# All credits to Andrew for his initial work
-# Version .17 6/8/2014
-# Jstack for a dump has been added into the ebrake command to be used with the detect command to see if server is responsive.
-# These dumps will be in starterpath/logs/threaddump.log and can be submitted to Schema to troubleshoot server crashes
+#
+# Hermes (continued)
+# A starmade wrapper script written in bash.
+#
+# Based on the work of Doomsider's and Titanmasher's Daemon Script for Starmade (DTSD).
+# And the init.d script 7/10/13 based off of http://paste.boredomsoft.org/main.php/view/62107887 by Andrew
+#
+# The init script functions will be more and more removed, because the sysV Init dies. In the future the script will work with systemd.
+# 
 # !!!You must update starmade.cfg for the Daemon to work on your setup!!!
 # The daemon should be ran from the intended user as it detects and writes the current username to the configuration file
 
 # Set the basics paths for the Daemon automatically.  This can be changed if needed for alternate configurations
 # This sets the path of the script to the actual script directory.  This is some magic I found on stackoverflow http://stackoverflow.com/questions/4774054/reliable-way-for-a-bash-script-to-get-the-full-path-to-itself	
+
 DAEMONPATH=$(cd `dirname "${BASH_SOURCE[0]}"` && pwd)/`basename "${BASH_SOURCE[0]}"`
-#DAEMONPATH='/etc/init.d/starmaded'
 CONFIGPATH="$(echo $DAEMONPATH | cut -d"." -f1).cfg"
 # Set the starter path to the correct directory.  rev here is used to make the string backwards so that it can be cut at the last forward slash 
 STARTERPATH=$(echo $DAEMONPATH | rev | cut -d"/" -f2- | rev)
