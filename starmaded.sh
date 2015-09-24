@@ -16,6 +16,20 @@ CONFIGPATH="$(echo $DAEMONPATH | cut -d"." -f1).cfg"
 STARTERPATH=$(echo $DAEMONPATH | rev | cut -d"/" -f2- | rev)
 # Since this is a Daemon it can be called on from anywhere from just about anything.  This function below ensures the Daemon is using the proper user for the correct privileges
 ME=$(whoami)
+
+#Init plugin system. Search for plugins, take them over in plugin_list, include them via "source" and reduce the entries to the function name
+plugin_list=($(ls "${STARTERPATH}"/starmaded_plugin_*))
+echo "Found ${#plugin_list[@]} Plugins: ${plugin_list[@]}"
+i=0
+mySep="starmaded_plugin_"
+while [ $i -lt ${#plugin_list[@]} ]
+do
+	source ${plugin_list[$i]}
+	tmp="${plugin_list[$i]#*$mySep}"
+	plugin_list[$i]="${tmp%%.sh*}"
+	(( i++ ))
+done
+
 as_user() {
 if [ "$ME" == "root" ] ; then
 	echo "Not running as root. Aborting..."
@@ -31,6 +45,10 @@ sm_config() {
 if [ -e $CONFIGPATH ]
 then
 	source $CONFIGPATH
+#call config from all plugins; Plugins have to check by themself if their configuration is already in the file
+	for fn in ${plugin_list[@]}; do
+		${fn}_config
+	done
 else
 # If no config file present set the username temporarily to the current user
 	USERNAME=$(whoami)
@@ -474,6 +492,10 @@ create_rankscommands
 				log_initstring $CURRENTSTRING &
 				;;
 			*) 
+# Default: pass the CURRENTSTRING to all plugins in list
+				for fn in ${plugin_list[@]}; do
+					$fn "$CURRENTSTRING"
+				done
 				;;
 			esac
 #			echo "all done"
