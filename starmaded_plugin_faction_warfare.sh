@@ -13,7 +13,7 @@ fi
 #SEARCHWIRELESS="[SERVER][ACTIVATION] activated wireless logic on"
 SEARCHWIRELESS="[SERVER][ACTIVATION] sent 'true'"
 case "$1" in
-	*"$SEARCHWIRELESS"*) 
+	*"$SEARCHWIRELESS"*)
 		pl_fwf_log_wireless_activated "$1" &
 		;;
 	*)
@@ -66,7 +66,7 @@ done
 
 if [ ! -e "$FWCHECKPOINTSFILE" ]
 then
-	echo "# List of claimable Faction Warfare Checkpoints" >"$FWCHECKPOINTSFILE" 
+	echo "# List of claimable Faction Warfare Checkpoints" >"$FWCHECKPOINTSFILE"
 fi
 
 for mine_name in ${MINES[@]} ; do
@@ -93,7 +93,7 @@ do
 		as_user "sed -i 's/currentwp=$old_wpoints/currentwp=$new_wpoints/g' $FWFACTIONFILEPFX$fid.txt"
 		as_user "screen -p 0 -S $SCREENID -X stuff $'/server_message_broadcast info \"Faction $fid got $wptoadd WP and has now $new_wpoints WP total.\"\n'"
 	done
-	
+
 done
 }
 
@@ -102,7 +102,7 @@ CONFIGCREATE="cat > $FACTIONWARFARECONFIG <<_EOF_
 #  Config file for Faction Warfare Plugin
 #  FWCHECKPOINTSFILE: There the actual state of all checkpoints is saved.
 #  FWFACTIONFILEPFX: The path and prefix of the warfare faction files
-#  FWCHECKPOINTROUNDTIME: Roundtime in seconds. It's the intervall where the ownership of 
+#  FWCHECKPOINTROUNDTIME: Roundtime in seconds. It's the intervall where the ownership of
 #  FWWARPOINTSPERCPROUND: How many Warpoints the factions get per owned checkpoint per round
 #  mines gets checked and warpoints get earned
 #  WARFACTIONIDS: The IDs of the attending factions
@@ -136,7 +136,7 @@ c=$1
 #Get shipname where wireless logic was activated
 mySep="Ship["
 c="${c#*$mySep}"
-c="${c%%]*}" 
+c="${c%%]*}"
 if [[ "${CHECKPOINT_TRIGGER[@]}" =~ "$c" ]]
 then
 	faction_id="${c##*_}"

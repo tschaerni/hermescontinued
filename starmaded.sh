@@ -8,11 +8,11 @@
 # The daemon should be ran from the intended user as it detects and writes the current username to the configuration file
 
 # Set the basics paths for the Daemon automatically.  This can be changed if needed for alternate configurations
-# This sets the path of the script to the actual script directory.  This is some magic I found on stackoverflow http://stackoverflow.com/questions/4774054/reliable-way-for-a-bash-script-to-get-the-full-path-to-itself	
+# This sets the path of the script to the actual script directory.  This is some magic I found on stackoverflow http://stackoverflow.com/questions/4774054/reliable-way-for-a-bash-script-to-get-the-full-path-to-itself
 DAEMONPATH=$(cd `dirname "${BASH_SOURCE[0]}"` && pwd)/`basename "${BASH_SOURCE[0]}"`
 #DAEMONPATH='/etc/init.d/starmaded'
 CONFIGPATH="$(echo $DAEMONPATH | cut -d"." -f1).cfg"
-# Set the starter path to the correct directory.  rev here is used to make the string backwards so that it can be cut at the last forward slash 
+# Set the starter path to the correct directory.  rev here is used to make the string backwards so that it can be cut at the last forward slash
 STARTERPATH=$(echo $DAEMONPATH | rev | cut -d"/" -f2- | rev)
 # Since this is a Daemon it can be called on from anywhere from just about anything.  This function below ensures the Daemon is using the proper user for the correct privileges
 ME=$(whoami)
@@ -83,7 +83,7 @@ then
 	as_user "mkdir $STARTERPATH/oldlogs"
 fi
 }
-sm_start() { 
+sm_start() {
 # Wipe and dead screens to prevent a false positive for a running Screenid
 screen -wipe
 # Check to see if StarMade is installed
@@ -100,15 +100,15 @@ else
 	echo "$SERVICE was not running... starting."
 # Check to see if logs and other directories exists and create them if they do not
 	sm_checkdir
-# Make sure screen log is shut down just in case it is still running    
+# Make sure screen log is shut down just in case it is still running
     if ps aux | grep -v grep | grep $SCREENLOG >/dev/null
     then
 		echo "Screenlog detected terminating"
-		PID=$(ps aux | grep -v grep | grep $SCREENLOG | awk '{print $2}')    
+		PID=$(ps aux | grep -v grep | grep $SCREENLOG | awk '{print $2}')
 		kill $PID
     fi
 # Check for the output.log and if it is there move it and save it with a time stamp
-    if [ -e /dev/shm/output.log ] 
+    if [ -e /dev/shm/output.log ]
     then
 		MOVELOG=$STARTERPATH/oldlogs/output_$(date '+%b_%d_%Y_%H.%M.%S').log
 		as_user "mv /dev/shm/output.log $MOVELOG"
@@ -128,7 +128,7 @@ else
 			sleep 1
 		fi
 	done
-    if ps aux | grep $SERVICE | grep -v grep | grep -v tee | grep -v rlwrap | grep port:$PORT >/dev/null 
+    if ps aux | grep $SERVICE | grep -v grep | grep -v tee | grep -v rlwrap | grep port:$PORT >/dev/null
     then
 		echo "$SERVICE is now running."
 		as_user "echo '' > $ONLINELOG"
@@ -139,7 +139,7 @@ else
 		fi
     else
 		echo "Could not start $SERVICE."
-    fi  
+    fi
 fi
 }
 sm_stop() {
@@ -168,7 +168,7 @@ then
 		kill $PID
 		for LOOPNO in {0..30}
 		do
-			if ps aux | grep $SERVICE | grep -v grep | grep -v tee | grep -v rlwrap | grep port:$PORT >/dev/null 
+			if ps aux | grep $SERVICE | grep -v grep | grep -v tee | grep -v rlwrap | grep port:$PORT >/dev/null
 			then
 				sleep 1
 			else
@@ -176,11 +176,11 @@ then
 				break
 			fi
 		done
-		if ps aux | grep $SERVICE | grep -v grep | grep -v tee | grep -v rlwrap | grep port:$PORT >/dev/null 
+		if ps aux | grep $SERVICE | grep -v grep | grep -v tee | grep -v rlwrap | grep port:$PORT >/dev/null
 		then
 			PID=$(ps aux | grep -v grep | grep $SERVICE | grep -v tee | grep port:$PORT | awk '{print $2}')
 			kill -9 $PID
-# This was added in to troubleshoot freezes at the request of Schema			
+# This was added in to troubleshoot freezes at the request of Schema
 			screen -wipe
 			$SERVICE took too long to close. $SERVICE had to be killed
 		fi
@@ -194,13 +194,13 @@ if ps aux | grep $SERVICE | grep -v grep | grep -v tee | grep -v rlwrap | grep p
 then
 	echo "$SERVICE is running! Will not start backup."
 else
-	echo "Backing up starmade data" 
-# Check to see if zip is installed, it isn't on most minimal server builds. 
+	echo "Backing up starmade data"
+# Check to see if zip is installed, it isn't on most minimal server builds.
 if command -v zip >/dev/null
-then 
-	if [ -d "$BACKUP" ] 
+then
+	if [ -d "$BACKUP" ]
 	then
-		cd $STARTERPATH 
+		cd $STARTERPATH
 		as_user "zip -r $BACKUPNAME$(date '+%b_%d_%Y_%H.%M.%S').zip StarMade"
 		as_user "mv $BACKUPNAME*.zip $BACKUP"
 		echo "Backup complete"
@@ -211,11 +211,11 @@ then
 # Create a zip of starmade with time stamp and put it in backup
 		as_user "zip -r $BACKUPNAME$(date '+%b_%d_%Y_%H.%M.%S').zip StarMade"
 		as_user "mv $BACKUPNAME*.zip $BACKUP"
-		echo "Backup complete" 
+		echo "Backup complete"
 	fi
 else
 	echo "Please install Zip"
-	fi 
+	fi
 fi
 }
 sm_upgrade() {
@@ -228,7 +228,7 @@ else
 # Execute the starters update routine for a headless server
 	as_user "java -jar StarMade-Starter.jar -nogui"
 fi
-echo "Upgrade Complete"	
+echo "Upgrade Complete"
 }
 sm_cronstop() {
 # Stop Cronjobs to prevent things from running during maintenance
@@ -242,7 +242,7 @@ as_user "crontab < cronbackup.dat"
 echo "Cronjobs restored"
 }
 sm_cronbackup() {
-# Backup Cronjobs 
+# Backup Cronjobs
 cd $STARTERPATH
 as_user "crontab -l > cronbackup.dat"
 echo "Cronjobs backed up"
@@ -250,7 +250,7 @@ echo "Cronjobs backed up"
 sm_ebrake() {
 if ps aux | grep $SERVICE | grep -v grep | grep -v tee | grep port:$PORT >/dev/null
 then
-	PID=$(ps aux | grep -v grep | grep $SERVICE | grep -v tee | grep port:$PORT | awk '{print $2}')    
+	PID=$(ps aux | grep -v grep | grep $SERVICE | grep -v tee | grep port:$PORT | awk '{print $2}')
 	jstack $PID >> $STARTERPATH/logs/threaddump.log
 	kill $PID
 # Give server a chance to gracefully shut down
@@ -269,7 +269,7 @@ then
 	then
 		PID=$(ps aux | grep -v grep | grep $SERVICE | grep -v tee | grep port:$PORT | awk '{print $2}')
 # This was added in to troubleshoot freezes at the request of Schema
-		jstack $PID >> $STARTERPATH/logs/threaddump.log  
+		jstack $PID >> $STARTERPATH/logs/threaddump.log
 		kill -9 $PID
 		echo $SERVICE has to be forcibly closed. A thread dump has been taken and is saved at $STARTERPATH/logs/threaddump.log and should be sent to schema.
 		screen -wipe
@@ -282,15 +282,15 @@ sm_detect() {
 # Special thanks to Fire219 for providing the means to test this script.  Appreciation to Titansmasher for collaboration.
 if ps aux | grep $SERVICE | grep -v grep | grep -v tee | grep port:$PORT >/dev/null
 then
-# Add in a routine to check for STDERR: [SQL] Fetching connection 
+# Add in a routine to check for STDERR: [SQL] Fetching connection
 # Send the curent time as a serverwide message
 	if (tail -5 /dev/shm/output.log | grep "Fetching connection" >/dev/null)
-	then 
+	then
 		echo "Database Repairing itself"
 	else
 # Set the current to Unix time which is number of seconds since Unix was created.  Next send this as a PM to Unix time which will cause the console to error back Unix time.
 		CURRENTTIME=$(date +%s)
-		as_user "screen -p 0 -S $SCREENID -X stuff $'/pm $CURRENTTIME testing\n'"   
+		as_user "screen -p 0 -S $SCREENID -X stuff $'/pm $CURRENTTIME testing\n'"
 		echo "Unix time is $CURRENTTIME"
 		sleep 10
 # Check output.log to see if message was recieved by server.  The tail variable may need to be adjusted so that the
@@ -320,9 +320,9 @@ then
 	then
 		echo "Logging is already running"
 	else
-		echo "Starting Logging" 
+		echo "Starting Logging"
 # Check to see if existing screen log exists and if so move and rename it
-		if [ -e $STARTERPATH/logs/screen.log ] 
+		if [ -e $STARTERPATH/logs/screen.log ]
 		then
 			MOVELOG=$STARTERPATH/oldlogs/screen_$(date '+%b_%d_%Y_%H.%M.%S').log
 			as_user "mv $STARTERPATH/logs/screen.log $MOVELOG"
@@ -334,7 +334,7 @@ fi
 }
 sm_status () {
 # Check to see is Starmade is running or not
-if ps aux | grep $SERVICE | grep -v grep | grep -v tee | grep port:$PORT >/dev/null 
+if ps aux | grep $SERVICE | grep -v grep | grep -v tee | grep port:$PORT >/dev/null
 then
 	echo "Starmade Server is running."
 else
@@ -358,12 +358,12 @@ if command -v jstack >/dev/null
 then
 	if ps aux | grep $SERVICE | grep -v grep | grep -v tee | grep port:$PORT >/dev/null
 	then
-		if [ "$#" -ne "2" ] 
+		if [ "$#" -ne "2" ]
 		then
 			echo "Usage - smdump <amount of thread dumps> <amount of delay between dumps> smdump 2 10"
-			exit 
+			exit
 		fi
-		PID=$(ps aux | grep -v grep | grep $SERVICE | grep -v tee | grep port:$PORT | awk '{print $2}')    
+		PID=$(ps aux | grep -v grep | grep $SERVICE | grep -v tee | grep port:$PORT | awk '{print $2}')
 		count=$2
 		delay=$3
 		while [ $count -gt 0 ]
@@ -384,7 +384,7 @@ echo "updatefiles - Updates all stored files to the latest format, if a change i
 echo "start - Starts the server"
 echo "stop - Stops the server with a server message and countdown approx 2 mins"
 echo "ebrake - Stop the server without a server message approx 30 seconds"
-echo "restore filename - Selected file unzips into the parent folder of starmade"  
+echo "restore filename - Selected file unzips into the parent folder of starmade"
 echo "backup - backs up current Starmade directory as zip"
 echo "backupstar - Stops cron and server, makes backup, restarts cron and server"
 echo "status - See if server is running"
@@ -394,7 +394,7 @@ echo "cronbackup - Backs up your cron file"
 echo "upgrade - Runs the starters upgrade routine"
 echo "upgradestar - Stops cron and server, runs upgrade, restarts cron and server"
 echo "restart - Stops and starts server"
-echo "detect - See if the server is frozen and restart if it is." 
+echo "detect - See if the server is frozen and restart if it is."
 echo "log - Logs admin, chat, player, and kills."
 echo "screenlog - Starts the logging function in a screen"
 echo "dump - Do a thread dump with number of times and delay between them"
@@ -403,7 +403,7 @@ echo "box - Send a colored message box.  Usage: box <red|blue|green> <playername
 sm_log() {
 #Saves the PID of this function being run
 SM_LOG_PID=$$
-# Chat commands are controlled by /playerfile/playername which contains the their rank and 
+# Chat commands are controlled by /playerfile/playername which contains the their rank and
 # rankcommands.log which has ranks followed by the commands that they are allowed to call
 echo "Logging started at $(date '+%b_%d_%Y_%H.%M.%S')"
 autovoteretrieval &
@@ -414,7 +414,7 @@ create_rankscommands
 # Create the playerfile folder if it doesnt exist
 	mkdir -p $PLAYERFILE
 	OLDBYTECOUNT=0
-# This while loop runs as long as starmade stays running    
+# This while loop runs as long as starmade stays running
 	while (ps aux | grep $SERVICE | grep -v grep | grep -v tee | grep port:$PORT >/dev/null)
 	do
 		sleep 0.1
@@ -434,7 +434,7 @@ create_rankscommands
 #			echo "Start at line $LINESTART"
 		fi
 # If the number of lines read from the log file is greater than last line read + 1 from the log then feed more lines.
-		if [ "$NUMOFLINES" -gt "$LINESTART" ] 
+		if [ "$NUMOFLINES" -gt "$LINESTART" ]
 		then
 #     		echo "$NUMOFLINES is the total lines of the log"
 #     		echo "$LINESTART is linestart"
@@ -457,41 +457,41 @@ create_rankscommands
 #		SEARCHCHAT="[CHAT]"
 		SEARCHADMIN="[ADMIN COMMAND]"
 		SEARCHINIT="SPAWNING NEW CHARACTER FOR PlS"
-# Linenumber is set to zero and the a while loop runs through every present array in Linestring	
+# Linenumber is set to zero and the a while loop runs through every present array in Linestring
 		LINENUMBER=0
-		while [ -n "${LINESTRING[$LINENUMBER]+set}" ] 
+		while [ -n "${LINESTRING[$LINENUMBER]+set}" ]
 		do
 #		echo "Current Line in Array $LINENUMBER"
 		CURRENTSTRING=${LINESTRING[$LINENUMBER]}
 		let LINENUMBER++
 # Case statement here is used to match search strings from the current array or line in linestring
 		case "$CURRENTSTRING" in
-			*"$SEARCHLOGIN"*) 
+			*"$SEARCHLOGIN"*)
 #				echo "Login detected"
 #				echo $CURRENTSTRING
 				log_on_login $CURRENTSTRING &
 				;;
-			*"$SEARCHREMOVE"*) 
+			*"$SEARCHREMOVE"*)
 #				echo "Remove detected"
 #				echo $CURRENTSTRING
 				log_playerlogout $CURRENTSTRING &
 				;;
- 			*"$SEARCHCHAT"*) 
+ 			*"$SEARCHCHAT"*)
 #				echo "Chat detected"
 #				echo $CURRENTSTRING
 				log_chatcommands $CURRENTSTRING &
 				log_chatlogging $CURRENTSTRING &
 				;;
-			*"$SEARCHADMIN"*) 
+			*"$SEARCHADMIN"*)
 #				echo "Admin detected"
 #				echo $CURRENTSTRING
 				log_admincommand $CURRENTSTRING &
 				;;
-			*"$SEARCHINIT"*) 
+			*"$SEARCHINIT"*)
 #				echo "Init detected"
 				log_initstring $CURRENTSTRING &
 				;;
-			*) 
+			*)
 # Default: pass the CURRENTSTRING to all plugins in list
 				for fn in ${plugin_list[@]}; do
 					$fn "$CURRENTSTRING"
@@ -500,7 +500,7 @@ create_rankscommands
 			esac
 #			echo "all done"
 		done
-	done	
+	done
 }
 parselog(){
 		SEARCHLOGIN="[SERVER][LOGIN] login received. returning login info for RegisteredClient: "
@@ -516,32 +516,32 @@ parselog(){
 		SEARCHDESTROY="PERMANENTLY DELETING ENTITY:"
 		SEARCHINIT="SPAWNING NEW CHARACTER FOR PlS"
 		case "$@" in
-			*"$SEARCHLOGIN"*) 
+			*"$SEARCHLOGIN"*)
 #				echo "Login detected"
 #				echo $@
 				log_on_login $@ &
 				;;
-			*"$SEARCHREMOVE"*) 
+			*"$SEARCHREMOVE"*)
 #				echo "Remove detected"
 #				echo $@
 				log_playerlogout $@ &
 				;;
- 			*"$SEARCHCHAT"*) 
+ 			*"$SEARCHCHAT"*)
 #				echo "Chat detected"
 #				echo $@
 				log_chatcommands $@ &
 				log_chatlogging $@ &
 				;;
-			*"$SEARCHADMIN"*) 
+			*"$SEARCHADMIN"*)
 #				echo "Admin detected"
 #				echo $@
 				log_admincommand $@ &
 				;;
-			*"$SEARCHINIT"*) 
+			*"$SEARCHINIT"*)
 #				echo "Init detected"
 				log_initstring $@ &
 				;;
-			*) 
+			*)
 				;;
 			esac
 }
@@ -555,39 +555,39 @@ then
 	echo "player found"
 	MESSAGE=${@:4}
 	case "$2" in
-		*"green"*) 
+		*"green"*)
 			as_user "screen -p 0 -S $SCREENID -X stuff $'/server_message_to info $3 \'$MESSAGE\'\n'"
 		;;
 		*"blue"*)
 			as_user "screen -p 0 -S $SCREENID -X stuff $'/server_message_to warning $3 \'$MESSAGE\'\n'"
 		;;
-		*"red"*) 
+		*"red"*)
 			as_user "screen -p 0 -S $SCREENID -X stuff $'/server_message_to error $3 \'$MESSAGE\'\n'"
 		;;
-		*) 
+		*)
 		;;
 	esac
 else
 	echo "No player found"
 	MESSAGE=${@:3}
 	case "$2" in
-		*"green"*) 
+		*"green"*)
 			as_user "screen -p 0 -S $SCREENID -X stuff $'/server_message_broadcast info \'$MESSAGE\'\n'"
 		;;
 		*"blue"*)
 			as_user "screen -p 0 -S $SCREENID -X stuff $'/server_message_broadcast warning \'$MESSAGE\'\n'"
 		;;
-		*"red"*) 
+		*"red"*)
 			as_user "screen -p 0 -S $SCREENID -X stuff $'/server_message_broadcast error \'$MESSAGE\'\n'"
 		;;
-		*) 
+		*)
 		;;
 	esac
 fi
 }
 #------------------------------Core logging functions-----------------------------------------
 
-log_playerinfo() { 
+log_playerinfo() {
 #Checks if the player has a mailbox file
 #echo "$1 is the player name"
 create_playerfile $1
@@ -642,7 +642,7 @@ then
 	as_user "sed -i 's/PlayerLoggedIn=.*/PlayerLoggedIn=Yes/g' $PLAYERFILE/$1"
 fi
 }
-log_chatlogging() { 
+log_chatlogging() {
 CHATGREP=$@
 if [[ ! $CHATGREP == *WARNING* ]] && [[ ! $CHATGREP == *object* ]]
 then
@@ -671,13 +671,13 @@ then
 # Set variable for what the player said
 			PLAYERCHAT=$(echo $CHATGREP | cut -d":" -f2- | tr -d \' | tr -d \")
 # Format the chat message to be written for the chat log
-			CHATMESSAGE="$(date '+%b_%d_%Y_%H.%M.%S') - \($PLAYERCHATID\)'$PLAYERCHAT'"  
-			as_user "echo $CHATMESSAGE >> $CHATLOG"	
+			CHATMESSAGE="$(date '+%b_%d_%Y_%H.%M.%S') - \($PLAYERCHATID\)'$PLAYERCHAT'"
+			as_user "echo $CHATMESSAGE >> $CHATLOG"
 		fi
 	fi
 fi
 }
-log_chatcommands() { 
+log_chatcommands() {
 # A big thanks to Titanmasher for his help with the Chat Commands.
 #echo "This was passed to chat commands $1"
 CHATGREP=$@
@@ -714,7 +714,7 @@ then
 			log_playerinfo $PLAYERCHATID
 		fi
 
-#	Grab the chat command itself by looking for ! and then cutting after that       
+#	Grab the chat command itself by looking for ! and then cutting after that
 		CCOMMAND=( $(echo $COMMAND | cut -d! -f2-) )
 #		CCOMMAND=( $(echo $CHATGREP | cut -d! -f2-) )
 #	echo "first command is ${CCOMMAND[0]} parameter 1 ${CCOMMAND[1]} parameter 2 ${CCOMMAND[2]} parameter 3 ${CCOMMAND[3]} "
@@ -723,7 +723,7 @@ then
 # 				echo "looking for player rank"
 		PLAYERRANK=$(grep Rank= "$PLAYERFILE/$PLAYERCHATID" | cut -d= -f2)
 # 	echo "$PLAYERRANK is the player rank"
-#				Find the allowed commands for the current player rank 
+#				Find the allowed commands for the current player rank
 # 				echo "looking for allowed commands"
 		ALLOWEDCOMMANDS=$(grep $PLAYERRANK $RANKCOMMANDS)
 #	echo $ALLOWEDCOMMANDS
@@ -757,7 +757,7 @@ then
 	fi
 fi
 }
-log_admincommand() { 
+log_admincommand() {
 if [[ ! $@ == *org.schema.schine.network.server.AdminLocalClient* ]] && [[ ! $@ =~ "no slot free for" ]]
 then
 	# Format the admin command string to be written to the admin log
@@ -765,7 +765,7 @@ then
 	as_user "echo '$ADMINSTR' >> $ADMINLOG"
 fi
 }
-log_playerlogout() { 
+log_playerlogout() {
 LOGOUTPLAYER=$(echo $@ | cut -d: -f2 | cut -d\( -f1 | tr -d ' ')
 #echo "$LOGOUTPLAYER passed to playerlogout"
 
@@ -783,7 +783,7 @@ LOGOFF="$LOGOUTPLAYER logged off at $(date '+%b_%d_%Y_%H.%M.%S') server time"
 as_user "echo $LOGOFF >> $GUESTBOOK"
 as_user "sed -i '/$LOGOUTPLAYER/d' $ONLINELOG"
 }
-log_on_login() { 
+log_on_login() {
 LOGINPLAYER=$(echo $@ | cut -d: -f2 | cut -d" " -f2)
 #echo "$LOGINPLAYER logged in"
 create_playerfile $LOGINPLAYER
@@ -802,7 +802,7 @@ log_initstring() {
 INITPLAYER=$(echo $@ | cut -d\[ -f3 | cut -d\; -f1 | tr -d " ")
 sleep 0.5
 log_playerinfo $INITPLAYER
-if grep -q "JustLoggedIn=Yes" $PLAYERFILE/$INITPLAYER 
+if grep -q "JustLoggedIn=Yes" $PLAYERFILE/$INITPLAYER
 then
 	LOGINMESSAGE="Welcome to the server $INITPLAYER! Type !HELP for chat commands"
 	# A chat message that is displayed whenever a player logs in
@@ -813,7 +813,7 @@ fi
 
 #------------------------------Game mechanics-----------------------------------------
 
-universeboarder() { 
+universeboarder() {
 if [ "$UNIVERSEBOARDER" = "YES" ]
 then
 	XULIMIT=$(($(echo $UNIVERSECENTER | cut -d"," -f1) + $UNIVERSERADIUS))
@@ -859,7 +859,7 @@ then
 		as_user "screen -p 0 -S $SCREENID -X stuff $'/change_sector_for $2 $NEWX $NEWY $NEWZ\n'"
 	fi
 fi
-	
+
 }
 randomhelptips(){
 create_tipfile
@@ -870,7 +870,7 @@ do
 	sleep $TIPINTERVAL
 done
 }
-autovoteretrieval(){ 
+autovoteretrieval(){
 if [[ "$SERVERKEY" == "00000000000000000000" ]]
 then
 	NOKEY=YES
@@ -917,7 +917,7 @@ FUNCTIONEXISTS=$?
 
 #---------------------------Files Daemon Writes and Updates---------------------------------------------
 
-write_factionfile() { 
+write_factionfile() {
 CREATEFACTION="cat > $FACTIONFILE/$1 <<_EOF_
 CreditsInBank=0
 _EOF_"
@@ -928,7 +928,7 @@ CONFIGCREATE="cat > $CONFIGPATH <<_EOF_
 #  Settings below can all be custom tailored to any setup.
 #  Username is your user on the server that runs starmade
 #  Backupname is the name you want your backup file to have
-#  Service is the name of your Starmade jar file 
+#  Service is the name of your Starmade jar file
 #  Backup is the path you want to move you backups to
 #  Starterpath is where you starter file is located.  Starmade folder will be located in this directory
 #  Maxmemory controls the total amount Java can use.  It is the -xmx variable in Java
@@ -964,7 +964,7 @@ VOTECHECKDELAY=10 #The time in seconds between each check of starmade-servers.or
 CREDITSPERVOTE=1000000 # The number of credits a player gets per voting point.
 UNIVERSEBOARDER=YES #Turn on and off the universe boarder (YES/NO)
 UNIVERSECENTER=\"2,2,2\" #Set the center of the universe boarder
-UNIVERSERADIUS=50 #Set the radius of the universe boarder around 
+UNIVERSERADIUS=50 #Set the radius of the universe boarder around
 TIPINTERVAL=600 #Number of seconds between each tip being shown
 STARTINGRANK=Ensign #The initial rank players recieve when they log in for the first time. Can be edited.
 _EOF_"
@@ -1008,7 +1008,7 @@ CREATETIP="cat > $TIPFILE <<_EOF_
 !HELP is your friend! If you are stuck on a command, use !HELP <Command>
 Want to get from place to place quickly? Try !FOLD
 Ever wanted to be rewarded for voting for the server? Vote now at starmade-servers.org to get voting points!
-Been voting a lot lately? You can spend your voting points on a Jump Gate! Try !ADDJUMP 
+Been voting a lot lately? You can spend your voting points on a Jump Gate! Try !ADDJUMP
 Want to reward people for killing your arch enemy? Try !POSTBOUNTY
 Fancy becoming a bounty hunter? Use !LISTBOUNTY to see all bounties
 Got too much money? Store some in your bank account with !DEPOSIT
@@ -1089,7 +1089,7 @@ NEWFILESTRING=( $(cat $PATHUPDATEFILE) )
 IFS=$OLD_IFS
 NEWARRAY=0
 as_user "rm $PATHUPDATEFILE"
-# The following rewrites the config file and preserves values from the old configuration file 
+# The following rewrites the config file and preserves values from the old configuration file
 while [ -n "${NEWFILESTRING[$NEWARRAY]+set}" ]
 do
 	NEWSTR=${NEWFILESTRING[$NEWARRAY]}
@@ -1112,12 +1112,12 @@ do
 		if [[ "$OLDVAR" == "$NEWVAR" ]]
 		then
 #			echo "Matched oldvar $OLDVAR to newvar $NEWVAR"
-			WRITESTRING=${NEWSTR/$NEWVAL/$OLDVAL} 
+			WRITESTRING=${NEWSTR/$NEWVAL/$OLDVAL}
 		fi
 	fi
 	let OLDARRAY++
 	done
-#	echo "Here is the writestring $WRITESTRING"	
+#	echo "Here is the writestring $WRITESTRING"
 	as_user "cat <<EOF >> $PATHUPDATEFILE
 $WRITESTRING
 EOF"
@@ -1142,7 +1142,7 @@ done
 #}
 
 #Bank Commands
-function COMMAND_DEPOSIT(){ 
+function COMMAND_DEPOSIT(){
 #Deposits money into your server account from your player
 #USAGE: !DEPOSIT <Amount>
 	if [ "$#" -ne "2" ]
@@ -1153,7 +1153,7 @@ function COMMAND_DEPOSIT(){
 		if ! test "$2" -gt 0 2> /dev/null
 		then
 			as_user "screen -p 0 -S $SCREENID -X stuff $'/pm $1 GALACTIC BANK - You must put in a positive number\n'"
-		else 
+		else
 # Run playerinfo command to update playerfile and get the current player credits
 			as_user "screen -p 0 -S $SCREENID -X stuff $'/pm $1 GALACTICE BANK - Connecting to servers\n'"
 			log_playerinfo $1
@@ -1172,12 +1172,12 @@ function COMMAND_DEPOSIT(){
 			then
 				BALANCECREDITS=$(grep CreditsInBank $PLAYERFILE/$1 | cut -d= -f2- |  tr -d ' ')
 #				echo $BALANCECREDITS
-				CREDITSTOTAL=$(grep CurrentCredits $PLAYERFILE/$1 | cut -d= -f2- |  tr -d ' ')  
+				CREDITSTOTAL=$(grep CurrentCredits $PLAYERFILE/$1 | cut -d= -f2- |  tr -d ' ')
 #				echo "Credits in log $CREDITTOTAL"
 #				echo "Total credits are $CREDITSTOTAL on person and $BALANCECREDITS in bank"
 #				echo "Credits to be deposited $2 "
 				if [ "$CREDITSTOTAL" -ge "$2" ]
-				then 
+				then
 #					echo "enough money detected"
 					NEWBALANCE=$(( $2 + $BALANCECREDITS ))
 					NEWCREDITS=$(( $CREDITSTOTAL - $2 ))
@@ -1198,11 +1198,11 @@ function COMMAND_DEPOSIT(){
 				as_user "screen -p 0 -S $SCREENID -X stuff $'/pm $1 Connecting to GALACTICE BANK servers failed\n'"
 			fi
 		fi
-	fi	
+	fi
 
 #
 }
-function COMMAND_WITHDRAW(){ 
+function COMMAND_WITHDRAW(){
 #Takes money out of your server account and gives it to your player
 #USAGE: !WITHDRAW <Amount>
 #	echo "Withdraw command"
@@ -1234,7 +1234,7 @@ function COMMAND_WITHDRAW(){
 		fi
 	fi
 }
-function COMMAND_TRANSFER(){ 
+function COMMAND_TRANSFER(){
 #Sends money from your bank account to another players account
 #USAGE: !TRANSFER <Player> <Amount>
 	if [ "$#" -ne "3" ]
@@ -1245,8 +1245,8 @@ function COMMAND_TRANSFER(){
 	if ! test "$3" -gt 0 2> /dev/null
 	then
 		as_user "screen -p 0 -S $SCREENID -X stuff $'/pm $1 GALACTIC BANK - You must put in a positive number\n'"
-	else 
-		if [ -e $PLAYERFILE/$2 ] >/dev/null 
+	else
+		if [ -e $PLAYERFILE/$2 ] >/dev/null
 		then
 			as_user "screen -p 0 -S $SCREENID -X stuff $'/pm $1 GALACTIC BANK - Connecting to servers\n'"
 			BALANCECREDITS=$(grep CreditsInBank $PLAYERFILE/$1 | cut -d= -f2 | tr -d ' ')
@@ -1266,7 +1266,7 @@ function COMMAND_TRANSFER(){
 			else
 				as_user "screen -p 0 -S $SCREENID -X stuff $'/pm $1 GALACTIC BANK - Not enough credits\n'"
 			fi
-		else 
+		else
 			as_user "screen -p 0 -S $SCREENID -X stuff $'/pm $1 GALACTIC BANK - No account found\n'"
 		fi
 	fi
@@ -1308,12 +1308,12 @@ function COMMAND_FDEPOSIT(){
 				then
 					BALANCECREDITS=$(grep CreditsInBank $FACTIONFILE/$FACTION | cut -d= -f2- |  tr -d ' ')
 #					echo $BALANCECREDITS
-					CREDITSTOTAL=$(grep CurrentCredits $PLAYERFILE/$1 | cut -d= -f2- |  tr -d ' ')  
+					CREDITSTOTAL=$(grep CurrentCredits $PLAYERFILE/$1 | cut -d= -f2- |  tr -d ' ')
 #					echo "Credits in log $CREDITTOTAL"
 #					echo "Total credits are $CREDITSTOTAL on person and $BALANCECREDITS in bank"
 #					echo "Credits to be deposited $2 "
 					if [ "$CREDITSTOTAL" -ge "$2" ]
-					then 
+					then
 #						echo "enough money detected"
 						NEWBALANCE=$(( $2 + $BALANCECREDITS ))
 						NEWCREDITS=$(( $CREDITSTOTAL - $2 ))
@@ -1488,8 +1488,8 @@ function COMMAND_RANKME(){
 	else
 			USERRANK=$(sed -n '3p' "$PLAYERFILE/$PLAYERCHATID" | cut -d" " -f2 | cut -d"[" -f2 | cut -d"]" -f1)
 			USERCOMMANDS=$(grep $USERRANK $RANKCOMMANDS | cut -d" " -f2-)
-			as_user "screen -p 0 -S $SCREENID -X stuff $'/pm $1 $1 rank is $USERRANK\n'" 
-			as_user "screen -p 0 -S $SCREENID -X stuff $'/pm $1 Commands available are $USERCOMMANDS\n'" 
+			as_user "screen -p 0 -S $SCREENID -X stuff $'/pm $1 $1 rank is $USERRANK\n'"
+			as_user "screen -p 0 -S $SCREENID -X stuff $'/pm $1 Commands available are $USERCOMMANDS\n'"
 	fi
 }
 function COMMAND_RANKLIST(){
@@ -1500,7 +1500,7 @@ function COMMAND_RANKLIST(){
 		as_user "screen -p 0 -S $SCREENID -X stuff $'/pm $1 Invalid parameters. Please use !RANKLIST\n'"
 	else
 	    LISTRANKS=( $(cut -d " " -f 1 $RANKCOMMANDS) )
-		CHATLIST=${LISTRANKS[@]}	
+		CHATLIST=${LISTRANKS[@]}
 		as_user "screen -p 0 -S $SCREENID -X stuff $'/pm $1 The Ranks are: $CHATLIST \n'"
 	fi
 }
@@ -1549,12 +1549,12 @@ function COMMAND_RANKCOMMAND(){
 	if [ "$#" -ne "1" ]
 	then
 		as_user "screen -p 0 -S $SCREENID -X stuff $'/pm $1 Invalid parameters. Please use !RANKCOMMAND\n'"
-	else		
+	else
 		RANKUCOMMAND=$(grep $PLAYERRANK $RANKCOMMANDS | cut -d" " -f2-)
 		as_user "screen -p 0 -S $SCREENID -X stuff $'/pm $1 Commands are $RANKUCOMMAND\n'"
 	fi
 }
-function COMMAND_VOTEBALANCE(){ 
+function COMMAND_VOTEBALANCE(){
 #Tells you how many voting points you have saved up
 #USAGE: !VOTEBALANCE
 	as_user "screen -p 0 -S $SCREENID -X stuff $'/pm $1 You have $(grep "VotingPoints=" $PLAYERFILE/$1 | cut -d= -f2 | tr -d " " ) votes to spend!\n'"
@@ -1579,13 +1579,13 @@ function COMMAND_PING(){
 }
 
 #Utility Commands
-function COMMAND_HELP(){ 
+function COMMAND_HELP(){
 #Provides help on any and all functions available to the player
 #USAGE: !HELP <Command (optional)>
 	if [ "$#" -gt "2" ]
 	then
 		as_user "screen -p 0 -S $SCREENID -X stuff $'/pm $1 Invalid parameters. Please use !HELP <Command (Optional)>\n'"
-	else		
+	else
 		PLAYERRANK[$1]=$(grep "Rank=" $PLAYERFILE/$1 | cut -d= -f2)
 		ALLOWEDCOMMANDS[$1]=$(grep $PLAYERRANK $RANKCOMMANDS)
 		HELPCOMMAND=$(echo $2 | tr [a-z] [A-Z])
@@ -1631,11 +1631,11 @@ function COMMAND_HELP(){
 }
 function COMMAND_CORE(){
 #Provides you with a ship core. Only usable once every 10 minutes
-#USAGE: !CORE	
+#USAGE: !CORE
 	if [ "$#" -ne "1" ]
 	then
 		as_user "screen -p 0 -S $SCREENID -X stuff $'/pm $1 Invalid parameters. Please use !CORE\n'"
-	else	
+	else
 		OLDPLAYERLASTCORE=$(grep PlayerLastCore $PLAYERFILE/$1 | cut -d= -f2- | tr -d ' ')
 		CURRENTTIME=$(date +%s)
 		ADJUSTEDTIME=$(( $CURRENTTIME - 600 ))
@@ -1651,7 +1651,7 @@ function COMMAND_CORE(){
 }
 
 #Vanilla Admin Commands
-function COMMAND_GIVEMETA(){ 
+function COMMAND_GIVEMETA(){
 #Gives you, or another player the specified meta item
 #USAGE: !GIVEMETA <Player (optional)> <METAUTEN>
 	if [ "$#" -ne "2" ] && [ "$#" -ne "3" ]
@@ -1674,12 +1674,12 @@ function COMMAND_CLEAR(){
 	if [ "$#" -ne "1" ]
 	then
 		as_user "screen -p 0 -S $SCREENID -X stuff $'/pm $1 Invalid parameters. Please use !CLEAR\n'"
-	else	
+	else
 		as_user "screen -p 0 -S $SCREENID -X stuff $'/give_all_items $1 -99999\n'"
-as_user "screen -p 0 -S $SCREENID -X stuff $'/pm $1 Your inventory has been cleaned\n'"		
+as_user "screen -p 0 -S $SCREENID -X stuff $'/pm $1 Your inventory has been cleaned\n'"
 	fi
 }
-function COMMAND_LISTWHITE(){ 
+function COMMAND_LISTWHITE(){
 #Tells you all the names, IPs and accounts that are whitelisted on the server
 #USAGE: !LISTWHITE <name/account/ip/all>
 	if [ "$#" -ne "2" ]
@@ -1722,7 +1722,7 @@ function COMMAND_LISTWHITE(){
 			as_user "screen -p 0 -S $SCREENID -X stuff $'/pm $1 All whitelisted names, accounts and ip\'s:\n'"
 		else
 			as_user "screen -p 0 -S $SCREENID -X stuff $'/pm $1 Invalid parameters. Please use !LISTWHITE <name/account/ip/all>\n'"
-		fi			
+		fi
 	fi
 }
 function COMMAND_TELEPORT(){
@@ -1731,7 +1731,7 @@ function COMMAND_TELEPORT(){
 	if [ "$#" -ne "4" ] && [ "$#" -ne "5" ]
 	then
 		as_user "screen -p 0 -S $SCREENID -X stuff $'/pm $1 Invalid parameters. Please use !TELEPORT <Player (optional)> <X> <Y> <Z>\n'"
-	else	
+	else
 		if [ "$2" -eq "$2" ] 2>/dev/null
 		then
 			as_user "screen -p 0 -S $SCREENID -X stuff $'/change_sector_for $1 $2 $3 $4\n'"
@@ -1753,7 +1753,7 @@ function COMMAND_MYDETAILS(){
 		for ENTRY in $(tac $PLAYERFILE/$1)
 		do
 			as_user "screen -p 0 -S $SCREENID -X stuff $'/pm $1 $ENTRY\n'"
-		done		
+		done
 		as_user "screen -p 0 -S $SCREENID -X stuff $'/pm $1 All details inside your playerfile:\n'"
 	fi
 }
@@ -1764,7 +1764,7 @@ function COMMAND_THREADDUMP(){
 	then
 		as_user "screen -p 0 -S $SCREENID -X stuff $'/pm $1 Invalid parameters. Please use !THREADDUMP\n'"
 	else
-		PID=$(ps aux | grep -v grep | grep $SERVICE | grep -v tee | grep port:$PORT | awk '{print $2}') 
+		PID=$(ps aux | grep -v grep | grep $SERVICE | grep -v tee | grep port:$PORT | awk '{print $2}')
 		as_user "jstack $PID >> $STARTERPATH/logs/threaddump$(date +%H%M%S.%N).log"
 		as_user "screen -p 0 -S $SCREENID -X stuff $'/pm $1 The current java process has been exported to logs/threaddump$(date +%H%M%S.%N).log\n'"
 	fi
@@ -1773,7 +1773,7 @@ function COMMAND_THREADDUMP(){
 #------------------------------Start of daemon script-----------------------------------------
 sm_config
 
-# End of regular Functions and the beginning of alias for commands, custom functions, and finally functions that use arguments. 
+# End of regular Functions and the beginning of alias for commands, custom functions, and finally functions that use arguments.
 case "$1" in
 	start)
 		sm_start
@@ -1845,7 +1845,7 @@ case "$1" in
 		sm_start
 		sm_cronrestore
 	;;
-	debug) 
+	debug)
 		echo ${@:2}
 		parselog ${@:2}
 	;;
