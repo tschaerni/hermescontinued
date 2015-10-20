@@ -1136,8 +1136,8 @@ bank_fee (){
 		if [[ $BALANCECREDITS -gt $BANKALLOWANCE ]]
 		then
 			FEE=$(( BALANCECREDITS * $REGULARBANKFEE / 100 ))
-			NEWCREDITS=$(( BALANCECREDITS - FEE ))
-			sed "s/Credits=$BALANCECREDITS/Credits=$NEWCREDITS/g" $i
+			NEWBALANCE=$(( BALANCECREDITS - FEE ))
+			as_user "sed -i 's/CreditsInBank=$BALANCECREDITS/CreditsInBank=$NEWBALANCE/g' $i"
 		else
 			continue
 		fi
