@@ -962,6 +962,9 @@ FACTIONFILE=$STARTERPATH/factionfiles #The folder that contains individual facti
 #------------------------Game settings----------------------------------------------------------------------------
 VOTECHECKDELAY=10 #The time in seconds between each check of starmade-servers.org
 CREDITSPERVOTE=1000000 # The number of credits a player gets per voting point.
+BANKALLOWANCE=1000000 # Tax allowance of the bank system
+REGULARBANKFEE=5 # regular Bank fee in percent
+DEPOSITBANKFEE=5 # Bank fee for deposits
 UNIVERSEBOARDER=YES #Turn on and off the universe boarder (YES/NO)
 UNIVERSECENTER=\"2,2,2\" #Set the center of the universe boarder
 UNIVERSERADIUS=50 #Set the radius of the universe boarder around
@@ -1124,6 +1127,21 @@ EOF"
 let NEWARRAY++
 done
 }
+# Execute for a regular Bank fee (i.e one day a week)
+bank_fee (){
+	for i in $PLAYERFILE/*
+	do
+		BALANCECREDITS=$(grep CreditsInBank $i | cut -d= -f2- |  tr -d ' ')
+		if [[ $BALANCECREDITS -gt $BANKALLOWANCE ]]
+		then
+			FEE=$(( BALANCECREDITS * $REGULARBANKFEE / 100 ))
+			NEWCREDITS=$(( BALANCECREDITS - FEE ))
+			sed "s/Credits=$BALANCECREDITS/Credits=$NEWCREDITS/g" $i
+		else
+			continue
+		fi
+	done
+}
 
 #---------------------------Chat Commands---------------------------------------------
 
@@ -1179,14 +1197,15 @@ function COMMAND_DEPOSIT(){
 				if [ "$CREDITSTOTAL" -ge "$2" ]
 				then
 #					echo "enough money detected"
-					NEWBALANCE=$(( $2 + $BALANCECREDITS ))
+					BANKTAX=$(( $2 * $DEPOSITBANKFEE / 100 ))
+					NEWBALANCE=$(( $2 + $BALANCECREDITS - $BANKTAX ))
 					NEWCREDITS=$(( $CREDITSTOTAL - $2 ))
 #					echo "new bank balance is $NEWBALANCE"
 					as_user "sed -i 's/CurrentCredits=$CREDITSTOTAL/CurrentCredits=$NEWCREDITS/g' $PLAYERFILE/$1"
 					as_user "sed -i 's/CreditsInBank=$BALANCECREDITS/CreditsInBank=$NEWBALANCE/g' $PLAYERFILE/$1"
 					#					as_user "sed -i '4s/.*/CreditsInBank=$NEWBALANCE/g' $PLAYERFILE/$1"
 					as_user "screen -p 0 -S $SCREENID -X stuff $'/give_credits $1 -$2\n'"
-					as_user "screen -p 0 -S $SCREENID -X stuff $'/pm $1 GALATIC BANK You successfully deposited $2 credits\n'"
+					as_user "screen -p 0 -S $SCREENID -X stuff $'/pm $1 GALATIC BANK You successfully deposited $2 credits with a tax of $BANKTAX\n'"
 					as_user "screen -p 0 -S $SCREENID -X stuff $'/pm $1 GALATIC BANK Your balance is now $NEWBALANCE\n'"
 					as_user "echo '$1 deposited $2' >> $BANKLOG"
 				else
@@ -1844,6 +1863,9 @@ case "$1" in
 		sm_upgrade
 		sm_start
 		sm_cronrestore
+	;;
+	bankfee)
+		bank_fee
 	;;
 	debug)
 		echo ${@:2}
