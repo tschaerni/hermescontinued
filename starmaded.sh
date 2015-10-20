@@ -394,6 +394,7 @@ echo "cronbackup - Backs up your cron file"
 echo "upgrade - Runs the starters upgrade routine"
 echo "upgradestar - Stops cron and server, runs upgrade, restarts cron and server"
 echo "restart - Stops and starts server"
+echo "bankfee - Bill the taxes for using the Banksystem"
 echo "detect - See if the server is frozen and restart if it is."
 echo "log - Logs admin, chat, player, and kills."
 echo "screenlog - Starts the logging function in a screen"
@@ -1873,7 +1874,7 @@ case "$1" in
 	;;
 	*)
 		echo "Doomsider's and Titanmasher's Starmade Daemon (DSD) V.17"
-		echo "Usage: starmaded.sh {help|start|stop|ebrake|restore|status|restart|upgrade|upgradestar|cronstop|cronbackup|cronrestore|backup|backupstar|detect|log|screenlog|dump|box}"
+		echo "Usage: starmaded.sh {help|start|stop|ebrake|restore|status|restart|upgrade|upgradestar|cronstop|cronbackup|cronrestore|bankfee|backup|backupstar|detect|log|screenlog|dump|box}"
 		#******************************************************************************
 		exit 1
 	;;
