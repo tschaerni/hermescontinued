@@ -17,18 +17,7 @@ STARTERPATH=$(echo $DAEMONPATH | rev | cut -d"/" -f2- | rev)
 # Since this is a Daemon it can be called on from anywhere from just about anything.  This function below ensures the Daemon is using the proper user for the correct privileges
 ME=$(whoami)
 
-#Init plugin system. Search for plugins, take them over in plugin_list, include them via "source" and reduce the entries to the function name
-plugin_list=($(ls "${STARTERPATH}"/starmaded_plugin_*))
-echo "Found ${#plugin_list[@]} Plugins: ${plugin_list[@]}"
-i=0
-mySep="starmaded_plugin_"
-while [ $i -lt ${#plugin_list[@]} ]
-do
-	source ${plugin_list[$i]}
-	tmp="${plugin_list[$i]#*$mySep}"
-	plugin_list[$i]="${tmp%%.sh*}"
-	(( i++ ))
-done
+PLUGINSLOADED=false
 
 as_user() {
 if [ "$ME" == "root" ] ; then
@@ -45,10 +34,6 @@ sm_config() {
 if [ -e $CONFIGPATH ]
 then
 	source $CONFIGPATH
-#call config from all plugins; Plugins have to check by themself if their configuration is already in the file
-	for fn in ${plugin_list[@]}; do
-		${fn}_config
-	done
 else
 # If no config file present set the username temporarily to the current user
 	USERNAME=$(whoami)
@@ -81,6 +66,30 @@ if [ ! -d "$STARTERPATH/oldlogs" ]
 then
 	echo "No oldlogs directory detected creating for logging"
 	as_user "mkdir $STARTERPATH/oldlogs"
+fi
+}
+sm_load_plugins() {
+if($PLUGINSLOADED == "false")
+then
+	PLUGINSLOADED=true
+	#Init plugin system. Search for plugins, take them over in plugin_list, include them via "source" and reduce the entries to the function name
+	plugin_list=($(ls "${STARTERPATH}"/starmaded_plugin_*))
+	echo "Found ${#plugin_list[@]} Plugins: ${plugin_list[@]}"
+	i=0
+	mySep="starmaded_plugin_"
+	while [ $i -lt ${#plugin_list[@]} ]
+	do
+		source ${plugin_list[$i]}
+		tmp="${plugin_list[$i]#*$mySep}"
+		plugin_list[$i]="${tmp%%.sh*}"
+		(( i++ ))
+	done
+
+	#call config from all plugins; Plugins have to check by themself if their configuration is already in the file
+	for fn in ${plugin_list[@]}; do
+		${fn}_config
+	done
+
 fi
 }
 sm_start() {
@@ -458,6 +467,9 @@ create_rankscommands
 #		SEARCHCHAT="[CHAT]"
 		SEARCHADMIN="[ADMIN COMMAND]"
 		SEARCHINIT="SPAWNING NEW CHARACTER FOR PlS"
+		SEARCHFACTIONCHANGE="is changing faction ("
+		SEARCHFACTIONTURN="[FACTIONMANAGER] faction update took:"
+		SEARCHCHANGE="has players attached. Doing Sector Change for PlS"
 # Linenumber is set to zero and the a while loop runs through every present array in Linestring
 		LINENUMBER=0
 		while [ -n "${LINESTRING[$LINENUMBER]+set}" ]
@@ -491,6 +503,11 @@ create_rankscommands
 			*"$SEARCHINIT"*)
 #				echo "Init detected"
 				log_initstring $CURRENTSTRING &
+				;;
+			*)
+			*"$SEARCHFACTIONCHANGE"*)
+				CURRENTSTRING=${CURRENTSTRING//'*'}
+				log_factionchange ${CURRENTSTRING//;} &
 				;;
 			*)
 # Default: pass the CURRENTSTRING to all plugins in list
@@ -601,17 +618,21 @@ then
 #echo "Player info $1 found"
 	PLAYERINFO=( $(tac /dev/shm/output.log | grep -m 1 -A 10 "Name: $1") )
 	IFS=$OLD_IFS
-	PNAME=$(echo ${PLAYERINFO[0]} | cut -d: -f2 | cut -d" " -f2)
+	PNAME=${PLAYERINFO[0]/*Name: }
+	PNAME=${PNAME// }
 #echo "Player name is $PNAME"
+	SMNAME=${PLAYERINFO[2]/*SM-NAME: }
+	SMNAME=${SMNAME// }
+#echo "StarMade-Registry name is $SMNAME"
 	PIP=$(echo ${PLAYERINFO[1]} | cut -d\/ -f2)
 #echo "Player IP is $PIP"
-	PCREDITS=$(echo ${PLAYERINFO[4]} | cut -d: -f2 | cut -d" " -f2)
+	PCREDITS=${PLAYERINFO[4]/*CREDITS: }
+	PCREDITS=${PCREDITS// }
 #echo "Credits are $PCREDITS"
-	PFACTION=$(echo ${PLAYERINFO[5]} | cut -d= -f2 | cut -d, -f1)
-	if [ "$PFACTION" -eq "$PFACTION" ] 2>/dev/null
+	PFACTION=${PLAYERINFO[5]/*id=}
+	PFACTION=${PFACTION//,*}
+	if [ -n $PFACTION ] 2>/dev/null
 	then
-		PFACTION=$PFACTION
-	else
 		PFACTION="None"
 	fi
 #echo "Faction id is $PFACTION"
@@ -633,6 +654,7 @@ then
 	fi
 	PLASTUPDATE=$(date +%s)
 #echo "Player file last update is $PLASTUPDATE"
+	as_user "sed -i 's/SMName=.*/s/SMName=$SMNAME/g' $PLAYERFILE/$1"
 	as_user "sed -i 's/CurrentIP=.*/CurrentIP=$PIP/g' $PLAYERFILE/$1"
 	as_user "sed -i 's/CurrentCredits=.*/CurrentCredits=$PCREDITS/g' $PLAYERFILE/$1"
 	as_user "sed -i 's/PlayerFaction=.*/PlayerFaction=$PFACTION/g' $PLAYERFILE/$1"
@@ -785,7 +807,8 @@ as_user "echo $LOGOFF >> $GUESTBOOK"
 as_user "sed -i '/$LOGOUTPLAYER/d' $ONLINELOG"
 }
 log_on_login() {
-LOGINPLAYER=$(echo $@ | cut -d: -f2 | cut -d" " -f2)
+LOGINPLAYER=${@/*Client: }
+LOGINPLAYER=${LOGINPLAYER// *}
 #echo "$LOGINPLAYER logged in"
 create_playerfile $LOGINPLAYER
 DATE=$(date '+%b_%d_%Y_%H.%M.%S')
@@ -800,7 +823,8 @@ as_user "echo $LOGON >> $GUESTBOOK"
 as_user "echo $LOGINPLAYER >> $ONLINELOG"
 }
 log_initstring() {
-INITPLAYER=$(echo $@ | cut -d\[ -f3 | cut -d\; -f1 | tr -d " ")
+INITPLAYER=${@//*PlS[}
+INITPLAYER=${INITPLAYER// *}
 sleep 0.5
 log_playerinfo $INITPLAYER
 if grep -q "JustLoggedIn=Yes" $PLAYERFILE/$INITPLAYER
@@ -810,6 +834,12 @@ then
 	as_user "screen -p 0 -S $SCREENID -X stuff $'/pm $INITPLAYER $LOGINMESSAGE\n'"
 	as_user "sed -i 's/JustLoggedIn=.*/JustLoggedIn=No/g' $PLAYERFILE/$INITPLAYER"
 fi
+}
+
+log_factionchange() {
+$NEWFACTION=${11}
+PLAYER=${3/PlS[}
+as_user "sed -i 's/PlayerFaction=.*/PlayerFaction=$NEWFACTION/g' $PLAYERFILE/$PLAYER"
 }
 
 #------------------------------Game mechanics-----------------------------------------
@@ -980,6 +1010,7 @@ Rank=$STARTINGRANK
 CreditsInBank=0
 VotingPoints=0
 CurrentVotes=0
+SMName=None
 CurrentIP=0.0.0.0
 CurrentCredits=0
 PlayerFaction=None
@@ -1796,6 +1827,7 @@ sm_config
 # End of regular Functions and the beginning of alias for commands, custom functions, and finally functions that use arguments.
 case "$1" in
 	start)
+		sm_load_plugins
 		sm_start
 	;;
 	status)
@@ -1805,9 +1837,11 @@ case "$1" in
 		sm_detect
 	;;
 	log)
+		sm_load_plugins
 		sm_log
 	;;
 	screenlog)
+		sm_load_plugins
 		sm_screenlog
 	;;
 	stop)
