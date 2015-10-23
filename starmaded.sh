@@ -17,7 +17,7 @@ STARTERPATH=$(echo $DAEMONPATH | rev | cut -d"/" -f2- | rev)
 # Since this is a Daemon it can be called on from anywhere from just about anything.  This function below ensures the Daemon is using the proper user for the correct privileges
 ME=$(whoami)
 
-PLUGINSLOADED=false
+PLUGINSLOADED="false"
 
 as_user() {
 if [ "$ME" == "root" ] ; then
@@ -69,7 +69,7 @@ then
 fi
 }
 sm_load_plugins() {
-if($PLUGINSLOADED == "false")
+if [ "$PLUGINSLOADED" == "false" ]
 then
 	PLUGINSLOADED=true
 	#Init plugin system. Search for plugins, take them over in plugin_list, include them via "source" and reduce the entries to the function name
@@ -461,6 +461,8 @@ create_rankscommands
 			LINESTRING=()
 		fi
 # Search strings that the logging function is looking to trigger events
+		SEARCHWARNING="WARNING"
+		SEARCHRAIL="[RAIL]"
 		SEARCHLOGIN="[SERVER][LOGIN] login received. returning login info for RegisteredClient: "
 		SEARCHREMOVE="[SERVER][DISCONNECT] Client 'RegisteredClient:"
 		SEARCHCHAT="[CHANNELROUTER] RECEIVED MESSAGE ON Server(0): [CHAT]"
@@ -479,6 +481,12 @@ create_rankscommands
 		let LINENUMBER++
 # Case statement here is used to match search strings from the current array or line in linestring
 		case "$CURRENTSTRING" in
+			*"$SEARCHWARNING"*)
+				continue
+				;;
+			*"$SEARCHRAIL"*)
+				continue
+				;;
 			*"$SEARCHLOGIN"*)
 #				echo "Login detected"
 #				echo $CURRENTSTRING
@@ -504,10 +512,12 @@ create_rankscommands
 #				echo "Init detected"
 				log_initstring $CURRENTSTRING &
 				;;
-			*)
 			*"$SEARCHFACTIONCHANGE"*)
 				CURRENTSTRING=${CURRENTSTRING//'*'}
 				log_factionchange ${CURRENTSTRING//;} &
+				;;
+			*"$SEARCHCHANGE"*)
+				log_sectorchange $CURRENTSTRING &
 				;;
 			*)
 # Default: pass the CURRENTSTRING to all plugins in list
@@ -629,11 +639,12 @@ then
 	PCREDITS=${PLAYERINFO[4]/*CREDITS: }
 	PCREDITS=${PCREDITS// }
 #echo "Credits are $PCREDITS"
-	PFACTION=${PLAYERINFO[5]/*id=}
+	PFACTION=${PLAYERINFO[5]//*FACTION: }
+	PFACTION=${PFACTION/*id=}
 	PFACTION=${PFACTION//,*}
-	if [ -n $PFACTION ] 2>/dev/null
+	if [ "$PFACTION" == "null" ]
 	then
-		PFACTION="None"
+		PFACTION="0"
 	fi
 #echo "Faction id is $PFACTION"
 	PSECTOR=$(echo ${PLAYERINFO[6]} | cut -d\( -f2 | cut -d\) -f1 | tr -d ' ')
@@ -807,7 +818,8 @@ as_user "echo $LOGOFF >> $GUESTBOOK"
 as_user "sed -i '/$LOGOUTPLAYER/d' $ONLINELOG"
 }
 log_on_login() {
-LOGINPLAYER=${@/*Client: }
+TMP="$@"
+LOGINPLAYER=${TMP/*Client: }
 LOGINPLAYER=${LOGINPLAYER// *}
 #echo "$LOGINPLAYER logged in"
 create_playerfile $LOGINPLAYER
@@ -823,7 +835,8 @@ as_user "echo $LOGON >> $GUESTBOOK"
 as_user "echo $LOGINPLAYER >> $ONLINELOG"
 }
 log_initstring() {
-INITPLAYER=${@//*PlS[}
+TMP="$@"
+INITPLAYER=${TMP//*PlS[}
 INITPLAYER=${INITPLAYER// *}
 sleep 0.5
 log_playerinfo $INITPLAYER
@@ -837,9 +850,30 @@ fi
 }
 
 log_factionchange() {
-$NEWFACTION=${11}
+if [ $# -ge 11 ]
+then
+	NEWFACTION=${11}
+else
+	NEWFACTION=$9
+fi
+#if StarMade Registry is deactivated, we have one entry less. (Only possible on local/test servers)
+if [ "$NEWFACTION" == "current" ]
+then
+	NEWFACTION=${10}
+fi
 PLAYER=${3/PlS[}
 as_user "sed -i 's/PlayerFaction=.*/PlayerFaction=$NEWFACTION/g' $PLAYERFILE/$PLAYER"
+}
+
+log_sectorchange(){
+PLAYER="$@"
+PLAYER=${PLAYER//*PlS[}
+PLAYER=${PLAYER// *}
+SECTOR="$@"
+SECTOR=${SECTOR//*(}
+SECTOR=${SECTOR/)}
+SECTOR=${SECTOR// }
+as_user "sed -i 's/PlayerLocation=.*/PlayerLocation=$SECTOR/g' $PLAYERFILE/$PLAYER"
 }
 
 #------------------------------Game mechanics-----------------------------------------
