@@ -51,15 +51,15 @@ fi
 
 source "$FACTIONWARFARECONFIG"
 echo "In warfare attending factions: ${WARFACTIONIDS[@]}"
-echo "Claimable mines: ${MINES[@]}"
+echo "Claimable checkpoints: ${CHECKPOINTS[@]}"
 
 for fid in ${WARFACTIONIDS[@]} ; do
 	pl_fwf_check_factionfile $fid
 done
 
-for mine_name in ${MINES[@]} ; do
+for checkpoint_name in ${CHECKPOINTS[@]} ; do
 	for faction_id in ${WARFACTIONIDS[@]} ; do
-		CHECKPOINT_TRIGGER=(${CHECKPOINT_TRIGGER[@]} "${mine_name}_${faction_id}")
+		CHECKPOINT_TRIGGER=(${CHECKPOINT_TRIGGER[@]} "${checkpoint_name}_${faction_id}")
 	done
 done
 
@@ -68,10 +68,10 @@ then
 	echo "# List of claimable Faction Warfare Checkpoints" >"$FWCHECKPOINTSFILE"
 fi
 
-for mine_name in ${MINES[@]} ; do
+for checkpoint_name in ${CHECKPOINTS[@]} ; do
 	if [ "$(grep "$mine_name" "$FWCHECKPOINTSFILE")" = "" ]
 	then
-		echo "$mine_name=0" >> "$FWCHECKPOINTSFILE"
+		echo "$checkpoint_name=0" >> "$FWCHECKPOINTSFILE"
 	fi
 done
 
@@ -124,7 +124,7 @@ CONFIGCREATE="cat > $FACTIONWARFARECONFIG <<_EOF_
 #  FWWARPOINTSPERCPROUND: How many Warpoints the factions get per owned checkpoint per round
 #  mines gets checked and warpoints get earned
 #  WARFACTIONIDS: The IDs of the attending factions
-#  MINES: IDs of the claimable mines. The entities with wirless blocks on them
+#  CHECKPOINTS: IDs of the claimable checkpoints. Example: ( CP_WP_Mine_6_6_6_part1 CP_WP_Mine_6_6_6_part2 CP_WP_Mine_6_6_6_part3 CP_WP_Mine_6_6_6_part4 )
 #  FUNCTIONALBEACONS: IDs of all avaliable beacons. Its function is described by in the name after the prefix. Example: CB_Scanner_001
 #         have to have their name to beginn with sich an ID and end with a WARFACTIONID.
 #         Example: Mine_6_6_6_part1_10001
@@ -132,7 +132,7 @@ FWCHECKPOINTSFILE=$FACTIONWARFAREFILES/checkpoints.txt
 FWFACTIONFILEPFX=$FACTIONWARFAREFILES/faction
 FWWARPOINTSPERCPROUND=1
 WARFACTIONIDS=( )
-MINES=( Mine_6_6_6_part1 Mine_6_6_6_part2 Mine_6_6_6_part3 Mine_6_6_6_part4 )
+CHECKPOINTS=( CP_WP_Mine_6_6_6 CP_Scanner_3_3_3 )
 FUNCTIONALBEACONS=( CB_Scanner_001 CB_Schnitzel_Dickbutt CB_Schnitzel_Blau CB_Schnitzel_Knack )
 DEFAULTBEACONBP=Beacon
 _EOF_"
@@ -186,9 +186,9 @@ then
 	SOURCE=${SOURCE//*ENTITY_SHIP_}
 #	SOURCE=${SOURCE//*ENTITY_SPACESTATION_}
 	pl_fwf_reload_checkpoints
-	if [[ " $MINES " =~ " $SOURCE " ]]
+	if [[ " $CHECKPOINTS " =~ " $SOURCE " ]]
 	then
-		TYPE="mine"
+		TYPE="cp"
 	else if [[ " $FUNCTIONALBEACONS " =~ " $SOURCE " ]]
 	then
 		TYPE="bc"
@@ -206,22 +206,37 @@ then
 	FACTIONID=$(grep "PlayerFaction=" "$PLAYERFILE/$PLAYER")
 	FACTIONID=${FACTIONID/*=}
 	FACTIONID=${FACTIONID// }
-
+	if [ -z "$FACTIONID" ] || [ $FACTIONID -eq 0 ] || [ "$FACTIONID" == "None" ]
+	then
+		as_user "screen -p 0 -S $SCREENID -X stuff $'/pm $PLAYER \"Your can\'t activate this beacon, because you are not in a faction!\"\n'"
+		return
+	fi
 # if faction paticipates in warfare or no explizit warfaction is set
 	if [[ " ${WARFACTIONIDS[@]} " =~ " $FACTIONID " ]] || [ ${#WARFACTIONIDS[@]} -eq 0 ]
 	then
 		pl_fwf_check_factionfile $FACTIONID
 #if source is a registerd chekpoint or mine
-		if [ "$TYPE" == "mine" ]
+		if [ "$TYPE" == "cp" ]
 		then
-			old_belonger=$(grep "$SOURCE=" "$FWCHECKPOINTSFILE")
-			old_belonger=${old_belonger//*=}
-			old_belonger=${old_belonger// }
-			if [ $old_belonger != $FACTIONID ]
-			then
-				as_user "sed -i 's/$SOURCE=$old_belonger/$SOURCE=$FACTIONID/g' '$FWCHECKPOINTSFILE'"
-				as_user "screen -p 0 -S $SCREENID -X stuff $'/server_message_broadcast info \"Checkpoint $SOURCE from $old_belonger now belongs to Faction $FACTIONID\"\n'"
-			fi
+			BCFUNCTION=${SOURCE//CP_}
+			BCFUNCTION=${BCFUNCTION//_*}
+			case "$BCFUNCTION" in
+				*"WP"*)
+					old_belonger=$(grep "$SOURCE=" "$FWCHECKPOINTSFILE")
+					old_belonger=${old_belonger//*=}
+					old_belonger=${old_belonger// }
+					if [ $old_belonger != $FACTIONID ]
+					then
+						as_user "sed -i 's/$SOURCE=$old_belonger/$SOURCE=$FACTIONID/g' '$FWCHECKPOINTSFILE'"
+						as_user "screen -p 0 -S $SCREENID -X stuff $'/server_message_broadcast info \"Checkpoint $SOURCE from $old_belonger now belongs to Faction $FACTIONID\"\n'"
+					fi
+					;;
+				*"Scanner"*)
+					echo "Checkpoint says: \"I am a Scanner!\""
+					;;
+				*)
+					;;
+			esac
 		else if [ "$TYPE" == "bc" ]
 		then
 #It is a beacon with some spceial function
@@ -243,7 +258,23 @@ then
 					NEW="${OLD/ $SOURCE / }"
 					as_user "sed -i 's/$OLD/$NEW/g' '$FACTIONWARFARECONFIG'"
 					;;
+				*"Pirate"*)
+					echo "Beacon says: \"Spawn a pirate for me!\""
+					;;
+				*"Gold"*)
+					echo "Beacon says: \"Give me gold!\""
+					;;
+				*"Faction"*)
+					echo "Beacon says: \"Give my faction FPs!\""
+					as_user "screen -p 0 -S $SCREENID -X stuff $'/pm $PLAYER \"Your faction got 100FP from a Factionbeacon!\"\n'"
+					as_user "screen -p 0 -S $SCREENID -X stuff $'/faction_point_add $FACTIONID 100\n'"
+					as_user "screen -p 0 -S $SCREENID -X stuff $'/destroy_uid ENTITY_SHIP_$SOURCE\n'"
+					;;
+				*"Random"*)
+					echo "Beacon says: \"Do a random thing!\""
+					;;
 				*)
+					echo "Unknown beacon function: $SOURCE"
 					;;
 			esac
 		fi
@@ -263,18 +294,18 @@ pl_fwf_reload_checkpoints() {
 FUNCTIONALBEACONS=$(grep "FUNCTIONALBEACONS=" $FACTIONWARFARECONFIG)
 FUNCTIONALBEACONS=${FUNCTIONALBEACONS/"FUNCTIONALBEACONS=("}
 FUNCTIONALBEACONS=${FUNCTIONALBEACONS/ )}
-MINES=$(grep "MINES=" $FACTIONWARFARECONFIG)
-MINES=${MINES/"MINES=("}
-MINES=${MINES/ )}
+CHECKPOINTS=$(grep "CHECKPOINTS=" $FACTIONWARFARECONFIG)
+CHECKPOINTS=${CHECKPOINTS/"CHECKPOINTS=("}
+CHECKPOINTS=${CHECKPOINTS/ )}
 }
 
 #Chat commands:
-function COMMAND_FW_MINES(){
+function COMMAND_FW_CHECKPOINTS(){
 #Allows you to see which mines are captured by which faction
 #USAGE: !FW_MINES
 	if [ "$#" -ne "1" ]
 	then
-		as_user "screen -p 0 -S $SCREENID -X stuff $'/pm $1 Invalid parameters. Please use !FW_MINES\n'"
+		as_user "screen -p 0 -S $SCREENID -X stuff $'/pm $1 Invalid parameters. Please use !FW_CHECKPOINTS\n'"
 	else
 		checkpoint_status="The current checkpoint status is: "
 		for checkpoint in $(cat "$FWCHECKPOINTSFILE"); do
@@ -402,9 +433,11 @@ else
 		then
 			BP=$3
 		else
-			BP=$DEFAULTBEACONBP
+			BCFUNCTION=${NAME//CB_}
+			BCFUNCTION=${BCFUNCTION//_*}
+			BP="${DEFAULTBEACONBP}_$BCFUNCTION"
 		fi
-		as_user "screen -p 0 -S $SCREENID -X stuff $'/spawn_entity $BP $NAME $LOCATION 0 false\n'"
+		as_user "screen -p 0 -S $SCREENID -X stuff $'/spawn_entity $BP $NAME $LOCATION -2 false\n'"
 		as_user "screen -p 0 -S $SCREENID -X stuff $'/pm $1 Created Beacon. If the beacon is not near you, something went wrong and you have to delete the entry with FW_ADMIN_DELETECB $2\n'"
 	else
 		as_user "screen -p 0 -S $SCREENID -X stuff $'/pm $1 Beacon with ID: $2 already in list\n'"
@@ -441,7 +474,7 @@ then
 	as_user "screen -p 0 -S $SCREENID -X stuff $'/pm $1 Invalid parameters. Please use !FW_ADMIN_CLEANUPCBS\n'"
 else
 	pl_fwf_reload_checkpoints
-	as_user "screen -p 0 -S $SCREENID -X stuff $'/pm $1 Begining cleanup, found ${#FUNCTIONALBEACONS[@]} entries, this could take a while\n'"
+	as_user "screen -p 0 -S $SCREENID -X stuff $'/pm $1 Begining cleanup, this could take a while\n'"
 	for beacon in $FUNCTIONALBEACONS; do
 		as_user "screen -p 0 -S $SCREENID -X stuff $'/destroy_uid ENTITY_SHIP_$beacon\n'"
 	done

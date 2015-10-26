@@ -89,7 +89,6 @@ then
 	for fn in ${plugin_list[@]}; do
 		${fn}_config
 	done
-
 fi
 }
 sm_start() {
