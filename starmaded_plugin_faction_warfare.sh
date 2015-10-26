@@ -301,8 +301,8 @@ CHECKPOINTS=${CHECKPOINTS/ )}
 
 #Chat commands:
 function COMMAND_FW_CHECKPOINTS(){
-#Allows you to see which mines are captured by which faction
-#USAGE: !FW_MINES
+#Allows you to see which checkpoints are captured by which faction
+#USAGE: !FW_CHECKPOINTS
 	if [ "$#" -ne "1" ]
 	then
 		as_user "screen -p 0 -S $SCREENID -X stuff $'/pm $1 Invalid parameters. Please use !FW_CHECKPOINTS\n'"
@@ -316,8 +316,8 @@ function COMMAND_FW_CHECKPOINTS(){
 }
 
 function COMMAND_FW_POINTS(){
-#Allows you to see which mines are captured by which faction
-#USAGE: !FW_MINES
+#Allows you to see the current Warpoints of ALL, OWN or a factionid
+#USAGE: !FW_POINTS <ALL,OWN,factionid>
 	if [ "$#" -ne "2" ]
 	then
 		as_user "screen -p 0 -S $SCREENID -X stuff $'/pm $1 Invalid parameters. Please use !FW_POINTS <ALL,OWN or factionid>\n'"
@@ -376,8 +376,8 @@ function COMMAND_FW_POINTS(){
 }
 
 function COMMAND_FW_EXCHANGE(){
-#Allows you to see which mines are captured by which faction
-#USAGE: !FW_MINES
+#Exchanges WPs to factionpoints or gold
+#USAGE: !FW_EXCHANGE <fp/gold> <amount>
 	if [ "$#" -ne "3" ]
 	then
 		as_user "screen -p 0 -S $SCREENID -X stuff $'/pm $1 Invalid parameters. Please use !FW_WPEXCHANGE fp/gold nr. Exchange factor 1wp = 100fp or 1wp=1gold\n'"
@@ -411,6 +411,7 @@ function COMMAND_FW_EXCHANGE(){
 #ADMIN Commands:
 function COMMAND_FW_ADMIN_CREATECB(){
 #Allows admins to easily create beacons
+#USAGE: !FW_ADMIN_CREATECB <function_name example: Faction_1> <optional blueprintname>
 if [ "$#" -ne "2" ] && [ "$#" -ne "3" ]
 then
 	as_user "screen -p 0 -S $SCREENID -X stuff $'/pm $1 Invalid parameters. Please use !FW_ADMIN_CREATECB beaconname <optional blueprintname>\n'"
@@ -446,7 +447,8 @@ fi
 }
 
 function COMMAND_FW_ADMIN_DELETECB(){
-#Allows admins to easily delete beacons
+#Allows admins to easily delete beacons in the list, does not destroy entities
+#USAGE: !FW_ADMIN_DELETECB <name>
 if [ "$#" -ne "2" ]
 then
 	as_user "screen -p 0 -S $SCREENID -X stuff $'/pm $1 Invalid parameters. Please use !FW_ADMIN_DELETECB beaconname\n'"
@@ -468,7 +470,8 @@ fi
 }
 
 function COMMAND_FW_ADMIN_CLEANUPCBS(){
-#Allows admins to easily delete beacons
+#Allows admins to easily delete beacons. Erases list and destroys all entities.
+#USAGE: !FW_ADMIN_CLEANUPCBS
 if [ "$#" -ne "1" ]
 then
 	as_user "screen -p 0 -S $SCREENID -X stuff $'/pm $1 Invalid parameters. Please use !FW_ADMIN_CLEANUPCBS\n'"
