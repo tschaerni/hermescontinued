@@ -67,19 +67,38 @@ as_user "$CONFIGCREATE"
 pl_bounty_kill() {
 echo "Found kill!"
 #remove * and ;
-TMPSTR=${$1//'*'}
+TMPSTR=${1//'*'}
 TMPSTR=${TMPSTR//;}
 #Get name of killed player
-KILLEDPLAYER=${TMPSTR}[1]
+KILLEDFACTION=($TMPSTR)
+KILLEDPLAYER=${KILLEDFACTION[1]}
 KILLEDPLAYER=${KILLEDPLAYER/PlS[}
 #Get faction of killed player
-KILLEDFACTION=${TMPSTR}[3]
+KILLEDFACTION=${KILLEDFACTION[3]}
 KILLEDFACTION=${KILLEDFACTION/*f(}
 KILLEDFACTION=${KILLEDFACTION/)]}
 
 #remove full first term including the serachstring 
 TMPSTR=${TMPSTR//*Announcing kill: }
 #now the next term could begin with "Ship" "PlayerCharacter" "HeatMissile" "FafoMissile" "Planet" "Sector" "PLS" "AICharacter"
+SOURCETYP=${TMPSTR//\[*}
+KILLERNAME=${TMPSTR//]*}
+KILLERNAME=${KILLERNAME//*\[}
+case "$SOURCETYP" in
+	*"Ship"*)
+		echo "$KILLEDPLAYER got killed by a $SOURCETYP named $KILLERNAME"
+		;;
+	*"PlayerCharacter"*)
+		echo "$KILLEDPLAYER got killed by a $SOURCETYP named $KILLERNAME"
+		;;
+	*"HeatMissile"*)
+		echo "$KILLEDPLAYER got killed by a $SOURCETYP named $KILLERNAME"
+		;;
+	*)
+		echo "$KILLEDPLAYER got killed by a $SOURCETYP named $KILLERNAME"
+		;;
+esac
+
 }
 
 pl_bounty_turn() {

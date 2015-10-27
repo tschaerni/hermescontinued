@@ -243,32 +243,41 @@ then
 			BCFUNCTION=${SOURCE//CB_}
 			BCFUNCTION=${BCFUNCTION//_*}
 			
+#delete beacon from list and delete entity. Do this before any other action to reduce the possibility of abuse. (F.e. use by two players simultaneously)
+			as_user "screen -p 0 -S $SCREENID -X stuff $'/destroy_uid ENTITY_SHIP_$SOURCE\n'"
+			OLD="$(grep "FUNCTIONALBEACONS=" "$FACTIONWARFARECONFIG")"
+			NEW="${OLD/ $SOURCE / }"
+			as_user "sed -i 's/$OLD/$NEW/g' '$FACTIONWARFARECONFIG'"
 			case "$BCFUNCTION" in
 				*"Scanner"*)
 					echo "Beacon says: \"Do a scan for me!\""
+					list_onlineplayers
+					SCANRESULT=""
+					for player in $ONLINEPLAYERS; do
+						POSITION=$(grep "PlayerLocation=" "$PLAYERFILE/$player")
+						POSITION=${POSITION/*=}
+						SCANRESULT="$SCANRESULT $player=($POSITION)"
+					done
+					as_user "screen -p 0 -S $SCREENID -X stuff $'/pm $PLAYER Receiving scan data: $SCANRESULT\n'"
 					;;
 				*"Schnitzel"*)
 					as_user "screen -p 0 -S $SCREENID -X stuff $'/server_message_broadcast info \"$PLAYER found the beacon $SOURCE for his faction $FACTIONID\"\n'"
-					as_user "screen -p 0 -S $SCREENID -X stuff $'/destroy_uid ENTITY_SHIP_$SOURCE\n'"
 					old=$(grep "beaconpoints=" "$FWFACTIONFILEPFX$FACTIONID.txt")
 					old=${old//*=}
 					old=${old// }
 					as_user "sed -i 's/beaconpoints=$old/beaconpoints=$(($old + 1))/g' '$FWFACTIONFILEPFX$FACTIONID.txt'"
-					OLD="$(grep "FUNCTIONALBEACONS=" "$FACTIONWARFARECONFIG")"
-					NEW="${OLD/ $SOURCE / }"
-					as_user "sed -i 's/$OLD/$NEW/g' '$FACTIONWARFARECONFIG'"
 					;;
 				*"Pirate"*)
 					echo "Beacon says: \"Spawn a pirate for me!\""
 					;;
 				*"Gold"*)
 					echo "Beacon says: \"Give me gold!\""
+					as_user "screen -p 0 -S $SCREENID -X stuff $'/give $PLAYER \"Silver Bar\" 1\n'"
 					;;
 				*"Faction"*)
 					echo "Beacon says: \"Give my faction FPs!\""
 					as_user "screen -p 0 -S $SCREENID -X stuff $'/pm $PLAYER \"Your faction got 100FP from a Factionbeacon!\"\n'"
 					as_user "screen -p 0 -S $SCREENID -X stuff $'/faction_point_add $FACTIONID 100\n'"
-					as_user "screen -p 0 -S $SCREENID -X stuff $'/destroy_uid ENTITY_SHIP_$SOURCE\n'"
 					;;
 				*"Random"*)
 					echo "Beacon says: \"Do a random thing!\""

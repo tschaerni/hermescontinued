@@ -418,8 +418,6 @@ echo "Logging started at $(date '+%b_%d_%Y_%H.%M.%S')"
 autovoteretrieval &
 randomhelptips &
 create_rankscommands
-# Create the Gate whitelist file if it doesnt exist
-	mkdir -p $GATEWHITELIST
 # Create the playerfile folder if it doesnt exist
 	mkdir -p $PLAYERFILE
 	OLDBYTECOUNT=0
@@ -622,10 +620,11 @@ as_user "screen -p 0 -S $SCREENID -X stuff $'/player_info $1\n'"
 sleep 2
 if tac /dev/shm/output.log | grep -m 1 -A 10 "Name: $1" >/dev/null
 then
+	extra_newlines=0
 	OLD_IFS=$IFS
 	IFS=$'\n'
 #echo "Player info $1 found"
-	PLAYERINFO=( $(tac /dev/shm/output.log | grep -m 1 -A 10 "Name: $1") )
+	PLAYERINFO=( $(tac /dev/shm/output.log | grep -m 1 -A 15 "Name: $1") )
 	IFS=$OLD_IFS
 	PNAME=${PLAYERINFO[0]/*Name: }
 	PNAME=${PNAME// }
@@ -638,33 +637,48 @@ then
 	PCREDITS=${PLAYERINFO[4]/*CREDITS: }
 	PCREDITS=${PCREDITS// }
 #echo "Credits are $PCREDITS"
-	PFACTION=${PLAYERINFO[5]//*FACTION: }
-	PFACTION=${PFACTION/*id=}
-	PFACTION=${PFACTION//,*}
-	if [ "$PFACTION" == "null" ]
+#Faction descriptions may have newlines, so we have to check for them here
+	while [[ ${PLAYERINFO[5+$extra_newlines]} != *"[SERVER-LOCAL-ADMIN] [PL]"* ]] && [ $extra_newlines -lt 10 ]
+	do
+		((extra_newlines++))
+	done
+
+	if [ $extra_newlines -lt 9 ]
 	then
-		PFACTION="0"
-	fi
+		PFACTION=${PLAYERINFO[5+$extra_newlines]//*FACTION: }
+		PFACTION=${PFACTION/*id=}
+		PFACTION=${PFACTION//,*}
+		if [ "$PFACTION" == "null" ] || [ "$PFACTION" == "0" ]
+		then
+			PFACTION="None"
+		fi
 #echo "Faction id is $PFACTION"
-	PSECTOR=$(echo ${PLAYERINFO[6]} | cut -d\( -f2 | cut -d\) -f1 | tr -d ' ')
+		PSECTOR=$(echo ${PLAYERINFO[6+$extra_newlines]} | cut -d\( -f2 | cut -d\) -f1 | tr -d ' ')
 #echo "Player sector is $PSECTOR"
-	if echo ${PLAYERINFO[7]} | grep SHIP >/dev/null
-	then
-		PCONTROLOBJECT=$(echo ${PLAYERINFO[7]} | cut -d: -f2 | cut -d" " -f2 | cut -d\[ -f1)
+		if echo ${PLAYERINFO[7+$extra_newlines]} | grep SHIP >/dev/null
+		then
+			PCONTROLOBJECT=$(echo ${PLAYERINFO[7+$extra_newlines]} | cut -d: -f2 | cut -d" " -f2 | cut -d\[ -f1)
 #		echo "Player controlled object is $PCONTROLOBJECT"
-		PCONTROLTYPE=$(echo ${PLAYERINFO[7]} | cut -d: -f2- | cut -d[ -f2 | cut -d] -f1)
+			PCONTROLTYPE=$(echo ${PLAYERINFO[7+$extra_newlines]} | cut -d: -f2- | cut -d[ -f2 | cut -d] -f1)
 #		echo "Player controlled entity type $PCONTROLTYPE"
-	fi
-	if echo ${PLAYERINFO[7]} | grep PLAYERCHARACTER >/dev/null
-	then
-		PCONTROLOBJECT=$(echo ${PLAYERINFO[7]} | cut -d: -f2 | cut -d" " -f2 | cut -d[ -f1)
+		fi
+		if echo ${PLAYERINFO[7+$extra_newlines]} | grep PLAYERCHARACTER >/dev/null
+		then
+			PCONTROLOBJECT=$(echo ${PLAYERINFO[7+$extra_newlines]} | cut -d: -f2 | cut -d" " -f2 | cut -d[ -f1)
 #		echo "Player controlled object is $PCONTROLOBJECT"
-		PCONTROLTYPE=Spacesuit
+			PCONTROLTYPE=Spacesuit
 #		echo "Player controlled entity type $PCONTROLTYPE"
+		fi
+	else
+#The Faction Description destroyed the PlayerInfo, use defaultvalues
+		echo "Got malformated playerinfo for player $1"
+		FACTION="0"
+		PSECTOR="0,0,0"
+		PCONTROLTYPE="Spacesuit"
 	fi
 	PLASTUPDATE=$(date +%s)
 #echo "Player file last update is $PLASTUPDATE"
-	as_user "sed -i 's/SMName=.*/s/SMName=$SMNAME/g' $PLAYERFILE/$1"
+	as_user "sed -i 's/SMName=.*/SMName=$SMNAME/g' $PLAYERFILE/$1"
 	as_user "sed -i 's/CurrentIP=.*/CurrentIP=$PIP/g' $PLAYERFILE/$1"
 	as_user "sed -i 's/CurrentCredits=.*/CurrentCredits=$PCREDITS/g' $PLAYERFILE/$1"
 	as_user "sed -i 's/PlayerFaction=.*/PlayerFaction=$PFACTION/g' $PLAYERFILE/$1"
@@ -824,10 +838,6 @@ LOGINPLAYER=${LOGINPLAYER// *}
 create_playerfile $LOGINPLAYER
 DATE=$(date '+%b_%d_%Y_%H.%M.%S')
 as_user "sed -i 's/JustLoggedIn=.*/JustLoggedIn=Yes/g' $PLAYERFILE/$LOGINPLAYER"
-as_user "sed -i 's/ChatCount=.*/ChatCount=0/g' $PLAYERFILE/$LOGINPLAYER"
-as_user "sed -i 's/SpamWarning=.*/SpamWarning=No/g' $PLAYERFILE/$LOGINPLAYER"
-as_user "sed -i 's/SwearCount=.*/SwearCount=0/g' $PLAYERFILE/$LOGINPLAYER"
-as_user "sed -i 's/CapsCount=.*/CapsCount=0/g' $PLAYERFILE/$LOGINPLAYER"
 as_user "sed -i 's/PlayerLastLogin=.*/PlayerLastLogin=$DATE/g' $PLAYERFILE/$LOGINPLAYER"
 LOGON="$LOGINPLAYER logged on at $(date '+%b_%d_%Y_%H.%M.%S') server time"
 as_user "echo $LOGON >> $GUESTBOOK"
@@ -859,6 +869,10 @@ fi
 if [ "$NEWFACTION" == "current" ]
 then
 	NEWFACTION=${10}
+fi
+if [ "$NEWFACTION" == "0" ]
+then
+	NEWFACTION="None"
 fi
 PLAYER=${3/PlS[}
 as_user "sed -i 's/PlayerFaction=.*/PlayerFaction=$NEWFACTION/g' $PLAYERFILE/$PLAYER"
@@ -1052,11 +1066,9 @@ PlayerControllingType=Spacesuit
 PlayerControllingObject=PlayerCharacter
 PlayerLastLogin=0
 PlayerLastCore=0
-PlayerLastFold=0
 PlayerLastUpdate=0
 PlayerLoggedIn=No
 JustLoggedIn=No
-PlayerHeat=0
 _EOF_"
 as_user "$PLAYERCREATE"
 }
@@ -1206,6 +1218,20 @@ bank_fee (){
 			continue
 		fi
 	done
+}
+
+#looks through all playerfiles and lists logged in players
+list_onlineplayers(){
+ONLINEPLAYERS=""
+for i in $PLAYERFILE/*
+do
+	LOGGEDIN=$(grep "PlayerLoggedIn=Yes" $i)
+	if [ -n "$LOGGEDIN" ]
+	then
+		i=${i/"$PLAYERFILE/"}
+		ONLINEPLAYERS="$ONLINEPLAYERS $i"
+	fi
+done
 }
 
 #---------------------------Chat Commands---------------------------------------------
@@ -1471,7 +1497,8 @@ function COMMAND_FBALANCE(){
 		as_user "screen -p 0 -S $SCREENID -X stuff $'/pm $1 Invalid parameters. Please use !BALANCE\n'"
 	else
 		as_user "screen -p 0 -S $SCREENID -X stuff $'/pm $1 GALACTIC BANK - Connecting to servers\n'"
-		log_playerinfo $1
+#We don't need log_playerinfo anymore here. We get the factionchanges directly.
+		create_playerfile $1
 		FACTION=$(grep "PlayerFaction" $PLAYERFILE/$1 | cut -d= -f2)
 		if [ ! $FACTION = "None" ]
 		then
