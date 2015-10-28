@@ -91,12 +91,22 @@ case "$SOURCETYP" in
 		as_user "screen -p 0 -S $SCREENID -X stuff $'/ship_info_uid \"ENTITY_SHIP_$KILLERNAME\"\n'"
 		sleep 0.5
 #[SERVER-LOCAL-ADMIN] DatabaseEntry [uid=ENTITY_SHIP_Station_Piratestation Gamma_8_5_5_144596482932710, sectorPos=(8, 5, 5), type=5, seed=0, lastModifier=, spawner=<system>, realName=Station_Piratestation Gamma_8_5_5_144596482932710, touched=true, faction=-1, pos=(0.0, -28.5, 101.0), minPos=(-1, -1, -1), maxPos=(1, 1, 1), creatorID=0]
+# --------------- If not found serach for something like this -------------
+#[SERVER-LOCAL-ADMIN] UID Not Found in DB: ENTITY_SHIP_NullPointer_1446064354948; checking unsaved objects
+#[SERVER-LOCAL-ADMIN] Attached: [PlS[AceFist [derblauefalke]*; id(321)(3)f(0)]]
 		ENTITYINFO=$(tac /dev/shm/output.log | grep -m 1 "\[SERVER-LOCAL-ADMIN\] DatabaseEntry \[uid=ENTITY_SHIP_$KILLERNAME, ")
-		KILLERFACTION=${ENTITYINFO//*faction=}
-		KILLERFACTION=${KILLERFACTION//,*}
-		echo "Faction of Killer: $KILLERFACTION"
+		if [ -n $ENTIYINFO ]
+		then
+			KILLERFACTION=${ENTITYINFO//*faction=}
+			KILLERFACTION=${KILLERFACTION//,*}
+			echo "Faction of Killer: $KILLERFACTION"
+		else
+			echo "Was an unsaved Entity, or we were too fast"
+		fi
 		;;
 	*"PlayerCharacter"*)
+		KILLERNAME=${KILLERNAME//*ENTITY_PLAYERCHARACTER_}
+		KILLERNAME=${KILLERNAME//)*}
 		echo "$KILLEDPLAYER got killed by a $SOURCETYP named $KILLERNAME"
 		KILLERFACTION=$(grep "PlayerFaction=" "$PLAYERFILE/$KILLERNAME")
 		KILLERFACTION=${KILLERFACTION/*=}
@@ -116,7 +126,7 @@ case "$SOURCETYP" in
 		;;
 esac
 
-if [ $KILLERFACTION -gt 0 ] && [ $KILLEDFACTION -ne $KILLEDFACTION ]
+if [ $KILLERFACTION -gt 0 ] && [ $KILLEDFACTION -ne $KILLERFACTION ]
 then
 	echo "No friendly fire, give killreward"
 fi
