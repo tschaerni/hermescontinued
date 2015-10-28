@@ -251,7 +251,7 @@ then
 			case "$BCFUNCTION" in
 				*"Scanner"*)
 					echo "Beacon says: \"Do a scan for me!\""
-					list_onlineplayers
+					ONLINEPLAYERS=($(cat $ONLINELOG))
 					SCANRESULT=""
 					for player in $ONLINEPLAYERS; do
 						POSITION=$(grep "PlayerLocation=" "$PLAYERFILE/$player")

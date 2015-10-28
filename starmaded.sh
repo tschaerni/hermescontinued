@@ -139,7 +139,7 @@ else
     if ps aux | grep $SERVICE | grep -v grep | grep -v tee | grep -v rlwrap | grep port:$PORT >/dev/null
     then
 		echo "$SERVICE is now running."
-		as_user "echo '' > $ONLINELOG"
+		as_user "rm $ONLINELOG 2> /dev/null"
 # Start sm_screemlog if logging is set to yes
 		if [ "$LOGGING" = "YES" ]
 		then
@@ -422,18 +422,20 @@ create_rankscommands
 	mkdir -p $PLAYERFILE
 	OLDBYTECOUNT=0
 # This while loop runs as long as starmade stays running
-	while (ps aux | grep $SERVICE | grep -v grep | grep -v tee | grep port:$PORT >/dev/null)
+	while (ps aux | grep $SERVICE | grep -v -e grep -e tee | grep port:$PORT >/dev/null)
 	do
 		sleep 0.1
 #First check if the byte-count changed, because wc -c ist over 50 times faster than wc -l
-		BYTECOUNT=$(wc -c /dev/shm/output.log | cut -d" " -f1)
+		BYTECOUNT=$(wc -c /dev/shm/output.log)
+		BYTECOUNT=${BYTECOUNT// *}
 		if [ "$BYTECOUNT" -eq "$OLDBYTECOUNT" ]
 		then
 			continue
 		fi
 		OLDBYTECOUNT=$BYTECOUNT
 # Uses Cat to calculate the number of lines in the log file
-		NUMOFLINES=$(wc -l /dev/shm/output.log | cut -d" " -f1)
+		NUMOFLINES=$(wc -l /dev/shm/output.log)
+		NUMOFLINES=${NUMOFLINES// *}
 # In case Linestart does not have a value give it an interger value of 1.  The prevents a startup error on the script.
 		if [ -z "$LINESTART" ]
 		then
@@ -445,7 +447,7 @@ create_rankscommands
 		then
 #     		echo "$NUMOFLINES is the total lines of the log"
 #     		echo "$LINESTART is linestart"
-			let LINESTART++
+			((LINESTART++))
 			OLD_IFS=$IFS
 # This sets the field seperator to use \n next line instead of next space.  This makes it so the array is a whole sentence not a word
 			IFS=$'\n'
@@ -475,7 +477,7 @@ create_rankscommands
 		do
 #		echo "Current Line in Array $LINENUMBER"
 		CURRENTSTRING=${LINESTRING[$LINENUMBER]}
-		let LINENUMBER++
+		((LINENUMBER++))
 # Case statement here is used to match search strings from the current array or line in linestring
 		case "$CURRENTSTRING" in
 			*"$SEARCHWARNING"*)
@@ -1218,20 +1220,6 @@ bank_fee (){
 			continue
 		fi
 	done
-}
-
-#looks through all playerfiles and lists logged in players
-list_onlineplayers(){
-ONLINEPLAYERS=""
-for i in $PLAYERFILE/*
-do
-	LOGGEDIN=$(grep "PlayerLoggedIn=Yes" $i)
-	if [ -n "$LOGGEDIN" ]
-	then
-		i=${i/"$PLAYERFILE/"}
-		ONLINEPLAYERS="$ONLINEPLAYERS $i"
-	fi
-done
 }
 
 #---------------------------Chat Commands---------------------------------------------
