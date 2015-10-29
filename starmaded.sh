@@ -1130,7 +1130,7 @@ then
 fi
 }
 create_factionfile(){
-if [[ ! -f $FACTIONFILE/$1 ]]
+if [[ ! -f $FACTIONFILE/$1 ]] && [ "$1" != "None" ]
 then
 #	echo "File not found"
 	write_factionfile $1

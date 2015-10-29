@@ -40,12 +40,19 @@ fi
 if [ ! -e "$BOUNTYFILESCONFIG" ]
 then
 	pl_bounty_write_config_file
-	as_user "echo \"#This file containes bounty on players\" > $BOUNTYFILEPLAYER"
-	as_user "echo \"#This file containes bounty on factions\" > $BOUNTYFILEFACTION"
 fi
 
 source "$BOUNTYFILESCONFIG"
 
+if [ ! -e "$BOUNTYFILEPLAYER" ]
+then
+	as_user "echo \"#This file containes bounty on players\" > $BOUNTYFILEPLAYER"
+fi
+
+if [ ! -e "$BOUNTYFILEFACTION" ]
+then
+	as_user "echo \"#This file containes bounty on factions\" > $BOUNTYFILEFACTION"
+fi
 }
 
 
@@ -106,7 +113,7 @@ case "$SOURCETYP" in
 #[SERVER-LOCAL-ADMIN] UID Not Found in DB: ENTITY_SHIP_NullPointer_1446064354948; checking unsaved objects
 #[SERVER-LOCAL-ADMIN] Attached: [PlS[AceFist [derblauefalke]*; id(321)(3)f(0)]]
 		ENTITYINFO=$(tac /dev/shm/output.log | grep -m 1 "\[SERVER-LOCAL-ADMIN\] DatabaseEntry \[uid=ENTITY_SHIP_$KILLERNAME, ")
-		if [ -n "$ENTIYINFO" ]
+		if [ -n "$ENTITYINFO" ]
 		then
 			KILLERFACTION=${ENTITYINFO//*faction=}
 			KILLERFACTION=${KILLERFACTION//,*}
