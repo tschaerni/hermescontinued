@@ -158,7 +158,7 @@ then
 	as_user "screen -p 0 -S $SCREENID -X eval 'stuff \"/chat Server restart will be back in some seconds.\"\015'"
 	as_user "screen -p 0 -S $SCREENID -X eval 'stuff \"/shutdown 60\"\015'"
 # Give the server a chance to gracefully shutdown if not kill it and then seg fault it if necessary
-	sleep 120
+	sleep 60
 	for LOOPNO in {0..30}
 	do
 		if ps aux | grep $SERVICE | grep -v grep | grep -v rlwrap | grep -v tee | grep port:$PORT >/dev/null
@@ -170,7 +170,7 @@ then
 		fi
 	done
 	if ps aux | grep $SERVICE | grep -v grep | grep -v tee | grep -v rlwrap | grep port:$PORT >/dev/null
-    then
+	then
 		echo $SERVICE is taking too long to close and may be frozen. Forcing shut down
 		PID=$(ps aux | grep -v grep | grep $SERVICE | grep -v tee | grep -v rlwrap | grep port:$PORT | awk '{print $2}')
 		kill $PID
@@ -674,7 +674,7 @@ then
 	else
 #The Faction Description destroyed the PlayerInfo, use defaultvalues
 		echo "Got malformated playerinfo for player $1"
-		FACTION="0"
+		PFACTION="None"
 		PSECTOR="0,0,0"
 		PCONTROLTYPE="Spacesuit"
 	fi
@@ -689,6 +689,11 @@ then
 	as_user "sed -i 's/PlayerControllingObject=.*/PlayerControllingObject=$PCONTROLOBJECT/g' $PLAYERFILE/$1"
 	as_user "sed -i 's/PlayerLastUpdate=.*/PlayerLastUpdate=$PLASTUPDATE/g' $PLAYERFILE/$1"
 	as_user "sed -i 's/PlayerLoggedIn=.*/PlayerLoggedIn=Yes/g' $PLAYERFILE/$1"
+	if [ "$PFACTION" != "None" ]
+	then
+		create_factionfile $PFACTION
+		as_user "sed -i 's/FactionLastUpdate=.*/FactionLastUpdate=$PLASTUPDATE/g' $FACTIONFILE/$PFACTION"
+	fi
 fi
 }
 log_chatlogging() {
@@ -878,6 +883,7 @@ then
 fi
 PLAYER=${3/PlS[}
 as_user "sed -i 's/PlayerFaction=.*/PlayerFaction=$NEWFACTION/g' $PLAYERFILE/$PLAYER"
+create_factionfile $NEWFACTION
 }
 
 log_sectorchange(){
@@ -998,8 +1004,10 @@ FUNCTIONEXISTS=$?
 #---------------------------Files Daemon Writes and Updates---------------------------------------------
 
 write_factionfile() {
+FLASTUPDATE=$(date +%s)
 CREATEFACTION="cat > $FACTIONFILE/$1 <<_EOF_
 CreditsInBank=0
+FactionLastUpdate=$FLASTUPDATE
 _EOF_"
 as_user "$CREATEFACTION"
 }

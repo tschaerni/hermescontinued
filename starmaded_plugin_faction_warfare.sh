@@ -50,8 +50,8 @@ then
 fi
 
 source "$FACTIONWARFARECONFIG"
-echo "In warfare attending factions: ${WARFACTIONIDS[@]}"
-echo "Claimable checkpoints: ${CHECKPOINTS[@]}"
+#echo "In warfare attending factions: ${WARFACTIONIDS[@]}"
+#echo "Claimable checkpoints: ${CHECKPOINTS[@]}"
 
 for fid in ${WARFACTIONIDS[@]} ; do
 	pl_fwf_check_factionfile $fid
@@ -65,7 +65,7 @@ done
 
 if [ ! -e "$FWCHECKPOINTSFILE" ]
 then
-	echo "# List of claimable Faction Warfare Checkpoints" >"$FWCHECKPOINTSFILE"
+	as_user "echo \"# List of claimable Faction Warfare Checkpoints\" > \"$FWCHECKPOINTSFILE\""
 fi
 
 for checkpoint_name in ${CHECKPOINTS[@]} ; do
@@ -132,8 +132,8 @@ FWCHECKPOINTSFILE=$FACTIONWARFAREFILES/checkpoints.txt
 FWFACTIONFILEPFX=$FACTIONWARFAREFILES/faction
 FWWARPOINTSPERCPROUND=1
 WARFACTIONIDS=( )
-CHECKPOINTS=( CP_WP_Mine_6_6_6 CP_Scanner_3_3_3 )
-FUNCTIONALBEACONS=( CB_Scanner_001 CB_Schnitzel_Dickbutt CB_Schnitzel_Blau CB_Schnitzel_Knack )
+CHECKPOINTS=( )
+FUNCTIONALBEACONS=( )
 DEFAULTBEACONBP=Beacon
 _EOF_"
 as_user "$CONFIGCREATE"
@@ -146,7 +146,7 @@ CONFIGCREATE="cat > $1 <<_EOF_
 #  name: The name of the faction
 #  currentwp: The current warpoints of the faction
 #  beaconpoints: The number of beacons found by this faction
-name='Unnamed'
+name=Unnamed
 currentwp=0
 beaconpoints=0
 _EOF_"
@@ -306,6 +306,47 @@ FUNCTIONALBEACONS=${FUNCTIONALBEACONS/ )}
 CHECKPOINTS=$(grep "CHECKPOINTS=" $FACTIONWARFARECONFIG)
 CHECKPOINTS=${CHECKPOINTS/"CHECKPOINTS=("}
 CHECKPOINTS=${CHECKPOINTS/ )}
+}
+
+sm_get_rnd_beacon_fn(){
+POSSIBLEFUNCTIONS=( Faction Faction Pirate Gold Gold Scanner Random Schnitzel None )
+RNDFUNCTION=$(( $RANDOM % ${#POSSIBLEFUNCTIONS[@]} ))
+RNDFUNCTION=${POSSIBLEFUNCTIONS[$RNDFUNCTION]}
+}
+
+
+sm_spawn_round() {
+# CB_<function>_GN_2_2_2_<nr>_RND
+# BEACONPREFIX = CB_
+# FUNCTION = f.e. Scanner
+# _
+# NAME = GENERATEDPREFIX(GN_) POSITION(2_2_2) Nr/Name(_ABC or _1) RANDOMNUMMER(_12857) to prevent abuse
+SPAWNLIST=$(cat $BEACONSPAWNLISTFILE)
+pl_fwf_reload_checkpoints
+OLD="$(grep "FUNCTIONALBEACONS=" "$FACTIONWARFARECONFIG")"
+NEW=$OLD
+for spawn in $SPAWNLIST; do
+	if [[ " $FUNCTIONALBEACONS " =~ "_${spawn}_" ]]
+	then
+		continue
+	fi
+	POS=${spawn/GN_}
+	POS=${POS%_*}
+	POS=${POS//_/ }
+	sm_get_rnd_beacon_fn
+	if [ "$RNDFUNCTION" == "None" ]
+	then
+		continue
+	fi
+	ENTITY="CB_${RNDFUNCTION}_${spawn}_$RANDOM"
+
+	NEW="${NEW:0: -1}"
+	NEW="$NEW$ENTITY )"
+
+	BP="${DEFAULTBEACONBP}_$RNDFUNCTION"
+	as_user "screen -p 0 -S $SCREENID -X stuff $'/spawn_entity $BP $ENTITY $POS -2 false\n'"
+done
+as_user "sed -i 's/$OLD/$NEW/g' '$FACTIONWARFARECONFIG'"
 }
 
 #Chat commands:
