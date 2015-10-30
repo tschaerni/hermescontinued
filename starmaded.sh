@@ -1399,22 +1399,22 @@ function COMMAND_FDEPOSIT(){
 		if [ "$2" -gt 0 ] 2>/dev/null
 		then
 			as_user "screen -p 0 -S $SCREENID -X stuff $'/pm $1 Connecting to GALACTICE BANK servers\n'"
-			log_playerinfo $1
+			#log_playerinfo $1
 			FACTION=$(grep "PlayerFaction=" $PLAYERFILE/$1 | cut -d= -f2)
 			if [ ! $FACTION = "None" ]
 			then
 				create_factionfile $FACTION
-				CURRENTTIME=$(date +%s)
+				#CURRENTTIME=$(date +%s)
 #				echo "Current time $CURRENTTIME"
-				OLDTIME=$(grep PlayerLastUpdate $PLAYERFILE/$1 | cut -d= -f2- |  tr -d ' ')
+				#OLDTIME=$(grep PlayerLastUpdate $PLAYERFILE/$1 | cut -d= -f2- |  tr -d ' ')
 #				echo "Old time from playerfile $OLDTIME"
-				ADJUSTEDTIME=$(( $CURRENTTIME - 10 ))
+				#ADJUSTEDTIME=$(( $CURRENTTIME - 10 ))
 #				echo "Adjusted time to remove 10 seconds $ADJUSTEDTIME"
-				if [ "$OLDTIME" -ge "$ADJUSTEDTIME" ]
-				then
-					BALANCECREDITS=$(grep CreditsInBank $FACTIONFILE/$FACTION | cut -d= -f2- |  tr -d ' ')
+				#if [ "$OLDTIME" -ge "$ADJUSTEDTIME" ]
+				#then
+					BALANCECREDITS=$(grep CreditsInBank= $FACTIONFILE/$FACTION | cut -d= -f2- |  tr -d ' ')
 #					echo $BALANCECREDITS
-					CREDITSTOTAL=$(grep CurrentCredits $PLAYERFILE/$1 | cut -d= -f2- |  tr -d ' ')
+					CREDITSTOTAL=$(grep CreditsInBank= $PLAYERFILE/$1 | cut -d= -f2- |  tr -d ' ')
 #					echo "Credits in log $CREDITTOTAL"
 #					echo "Total credits are $CREDITSTOTAL on person and $BALANCECREDITS in bank"
 #					echo "Credits to be deposited $2 "
@@ -1424,10 +1424,11 @@ function COMMAND_FDEPOSIT(){
 						NEWBALANCE=$(( $2 + $BALANCECREDITS ))
 						NEWCREDITS=$(( $CREDITSTOTAL - $2 ))
 #						echo "new bank balance is $NEWBALANCE"
-						as_user "sed -i 's/CurrentCredits=.*/CurrentCredits=$NEWCREDITS/g' $PLAYERFILE/$1"
+						#as_user "sed -i 's/CurrentCredits=.*/CurrentCredits=$NEWCREDITS/g' $PLAYERFILE/$1"
 						as_user "sed -i 's/CreditsInBank=.*/CreditsInBank=$NEWBALANCE/g' $FACTIONFILE/$FACTION"
+						as_user "sed -i 's/CreditsInBank=.*/CreditsInBank=$NEWCREDITS/g' $PLAYERFILE/$1"
 #						as_user "sed -i '4s/.*/CreditsInBank=$NEWBALANCE/g' $PLAYERFILE/$1"
-						as_user "screen -p 0 -S $SCREENID -X stuff $'/give_credits $1 -$2\n'"
+						#as_user "screen -p 0 -S $SCREENID -X stuff $'/give_credits $1 -$2\n'"
 						as_user "screen -p 0 -S $SCREENID -X stuff $'/pm $1 GALATIC BANK You successfully deposited $2 credits\n'"
 						as_user "screen -p 0 -S $SCREENID -X stuff $'/pm $1 GALATIC BANK Your factions balance is now $NEWBALANCE\n'"
 						as_user "echo '$1 deposited $2 into $FACTION bank account' >> $BANKLOG"
@@ -1435,10 +1436,10 @@ function COMMAND_FDEPOSIT(){
 						as_user "screen -p 0 -S $SCREENID -X stuff $'/pm $1 GALATIC BANK Insufficient money\n'"
 #						echo "not enough money"
 					fi
-				else
+				#else
 #					echo "Time difference to great, playerfile not updated recently"
-					as_user "screen -p 0 -S $SCREENID -X stuff $'/pm $1 Connecting to GALACTICE BANK servers failed\n'"
-				fi
+				#	as_user "screen -p 0 -S $SCREENID -X stuff $'/pm $1 Connecting to GALACTICE BANK servers failed\n'"
+				#fi
 			else
 				as_user "screen -p 0 -S $SCREENID -X stuff $'/pm $1 GALACTICE BANK - You are not in a faction\n'"
 			fi
@@ -1452,12 +1453,12 @@ function COMMAND_FWITHDRAW(){
 #USAGE: !FWITHDRAW <Amount>
 	if [ "$#" -ne "2" ]
 	then
-		as_user "screen -p 0 -S $SCREENID -X stuff $'/pm $1 Invalid parameters. Please use !FACTIONWITHDRAW <Amount>\n'"
+		as_user "screen -p 0 -S $SCREENID -X stuff $'/pm $1 Invalid parameters. Please use !FWITHDRAW <Amount>\n'"
 	else
 		if [ "$2" -gt 0 ] 2>/dev/null
 		then
 			as_user "screen -p 0 -S $SCREENID -X stuff $'/pm $1 GALACTICE BANK - Connecting to servers\n'"
-			log_playerinfo $1
+			#log_playerinfo $1
 			FACTION=$(grep "PlayerFaction=" $PLAYERFILE/$1 | cut -d= -f2)
 			if [ ! $FACTION = "None" ]
 			then
@@ -1468,8 +1469,13 @@ function COMMAND_FWITHDRAW(){
 				then
 					NEWBALANCE=$(( $BALANCECREDITS - $2 ))
 #					echo "new balance for bank account is $NEWBALANCE"
-					as_user "screen -p 0 -S $SCREENID -X stuff $'/give_credits $1 $2\n'"
+					#as_user "screen -p 0 -S $SCREENID -X stuff $'/give_credits $1 $2\n'"
 					as_user "sed -i 's/CreditsInBank=$BALANCECREDITS/CreditsInBank=$NEWBALANCE/g' $FACTIONFILE/$FACTION"
+					PLAYERBALANCE=$(grep "CreditsInBank=" $PLAYERFILE/$1)
+					PLAYERBALANCE=${PLAYERBALANCE//*=}
+					PLAYERBALANCE=${PLAYERBALANCE// }
+					PLAYERBALANCE=$(( $PLAYERBALANCE + $2 ))
+					as_user "sed -i 's/CreditsInBank=.*/CreditsInBank=$PLAYERBALANCE/g' $PLAYERFILE/$1"
 					as_user "screen -p 0 -S $SCREENID -X stuff $'/pm $1 GALATIC BANK You successfully withdrawn $2 credits\n'"
 					as_user "screen -p 0 -S $SCREENID -X stuff $'/pm $1 GALATIC BANK The factions balance is $NEWBALANCE credits\n'"
 					as_user "echo '$1 witdrew $2 from $FACTION' >> $BANKLOG"

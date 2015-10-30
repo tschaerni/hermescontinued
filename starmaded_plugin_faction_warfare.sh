@@ -233,6 +233,14 @@ then
 					;;
 				*"Scanner"*)
 					echo "Checkpoint says: \"I am a Scanner!\""
+					ONLINEPLAYERS=($(cat $ONLINELOG))
+					SCANRESULT=""
+					for player in ${ONLINEPLAYERS[@]}; do
+						POSITION=$(grep "PlayerLocation=" "$PLAYERFILE/$player")
+						POSITION=${POSITION/*=}
+						SCANRESULT="$SCANRESULT $player=($POSITION)"
+					done
+					as_user "screen -p 0 -S $SCREENID -X stuff $'/pm $PLAYER Receiving scan data: $SCANRESULT\n'"
 					;;
 				*)
 					;;
@@ -253,7 +261,7 @@ then
 					echo "Beacon says: \"Do a scan for me!\""
 					ONLINEPLAYERS=($(cat $ONLINELOG))
 					SCANRESULT=""
-					for player in $ONLINEPLAYERS; do
+					for player in ${ONLINEPLAYERS[@]}; do
 						POSITION=$(grep "PlayerLocation=" "$PLAYERFILE/$player")
 						POSITION=${POSITION/*=}
 						SCANRESULT="$SCANRESULT $player=($POSITION)"

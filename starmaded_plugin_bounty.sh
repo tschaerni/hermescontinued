@@ -133,7 +133,11 @@ case "$SOURCETYP" in
 		KILLERNAME=${TMPSTR//PlS[}
 		KILLERNAME=${KILLERNAME// *}
 		echo "$KILLEDPLAYER of faction $KILLEDFACTION got killed by a $SOURCETYP named $KILLERNAME"
-		pl_bounty_kill_direct
+		if [ "$KILLEDPLAYER" != "$KILLERNAME" ]
+		then
+			echo "Got non sucide from a PlS"
+			pl_bounty_kill_direct
+		fi
 		;;
 	*"HeatMissile"*)
 		echo "$KILLEDPLAYER of faction $KILLEDFACTION got killed by a $SOURCETYP named $KILLERNAME"
@@ -205,7 +209,8 @@ while [ $i -lt ${#BOUNTYSTRING[@]} ]; do
 	bounty=${LINE[2]/*=}
 	if [ $TURNSLEFT -gt 0 ] && [ $balance -ge $bounty ]
 	then
-		as_user "echo \"${LINE[@]}\" >> $BOUNTYFILEPLAYER"
+		TMP="${LINE[@]}"
+		as_user "echo \"$TMP\" >> $BOUNTYFILEPLAYER"
 	else
 #Give money back
 		PLAYER=${LINE[1]/*=}
@@ -234,7 +239,8 @@ while [ $i -lt ${#BOUNTYSTRING[@]} ]; do
 	bounty=${LINE[2]/*=}
 	if [ $TURNSLEFT -gt 0 ] && [ $balance -ge $bounty ]
 	then
-		as_user "echo \"${LINE[@]}\" >> $BOUNTYFILEFACTION"
+		TMP="${LINE[@]}"
+		as_user "echo \"$TMP\" >> $BOUNTYFILEFACTION"
 	else
 #Give money back
 		FACTIONID=${LINE[1]/*=}
@@ -300,6 +306,51 @@ fi
 echo "Bounty for $KILLEDPLAYER is $PLAYERBOUNTY + Factionbounty of $FACTIONBOUNTY"
 }
 
+pl_bounty_calc_bounty() {
+FACTION=$(grep "PlayerFaction=" "$PLAYERFILE/$PLAYER")
+FACTION=${FACTION/*=}
+FACTION=${FACTION// }
+OLD_IFS=$IFS
+IFS=$'\n'
+BOUNTYSTRING=($(grep "PlayerWanted=$PLAYER" "$BOUNTYFILEPLAYER"))
+IFS=$OLD_IFS
+i=0
+PLAYERBOUNTY=0
+while [ $i -lt ${#BOUNTYSTRING[@]} ]; do
+	LINE=(${BOUNTYSTRING[$i]})
+	bounty=${LINE[2]/*=}
+	balance=${LINE[3]/*=}
+	if [ $bounty -le $balance ]
+	then
+		balance=$(($balance - $bounty))
+		PLAYERBOUNTY=$(($PLAYERBOUNTY + $bounty))
+	fi
+	((i++))
+done
+
+if [ "$FACTION" != "None" ]
+then
+	OLD_IFS=$IFS
+	IFS=$'\n'
+	BOUNTYSTRING=($(grep "FactionWanted=$FACTION" "$BOUNTYFILEFACTION"))
+	IFS=$OLD_IFS
+	i=0
+	FACTIONBOUNTY=0
+	while [ $i -lt ${#BOUNTYSTRING[@]} ]; do
+		LINE=(${BOUNTYSTRING[$i]})
+		bounty=${LINE[2]/*=}
+		balance=${LINE[3]/*=}
+		if [ $bounty -le $balance ]
+		then
+			balance=$(($balance - $bounty))
+			FACTIONBOUNTY=$(($FACTIONBOUNTY + $bounty))
+		fi
+		((i++))
+	done
+fi
+echo "Bounty for $PLAYER is $PLAYERBOUNTY + Factionbounty of $FACTIONBOUNTY"
+}
+
 #Chat commands:
 function COMMAND_SETPLAYERBOUNTY() {
 #Param 1 = Playername 2 = Victimname 3 = Reward 4 = Balance 5 = Timespan
@@ -363,6 +414,7 @@ FACTIONID=${FACTIONID// }
 if [ "$FACTIONID" == "None" ]
 then
 	as_user "screen -p 0 -S $SCREENID -X stuff $'/pm $1 You are not in a faction!\n'"
+	return
 fi
 if [ ! "$4" -ge "$3" ]
 then
@@ -382,4 +434,44 @@ then
 else
 	as_user "screen -p 0 -S $SCREENID -X stuff $'/pm $1 Insufficient funds on faction bankaccount!\n'"
 fi
+}
+
+function COMMAND_GETFACTIONID() {
+if [ $# -ne 1 ]
+then
+	as_user "screen -p 0 -S $SCREENID -X stuff $'/pm $1 Invalid parameters. Please use !GETFACTIONID <playername>\n'"
+	return
+fi
+if [ ! -e "$PLAYERFILE/$2" ]
+then
+	as_user "screen -p 0 -S $SCREENID -X stuff $'/pm $1 Player $2 does not exist!\n'"
+	return
+fi
+FACTIONID=$(grep "PlayerFaction=" "$PLAYERFILE/$2")
+FACTIONID=${FACTIONID/*=}
+FACTIONID=${FACTIONID// }
+if [ "$FACTIONID" == "None" ]
+then
+	as_user "screen -p 0 -S $SCREENID -X stuff $'/pm $1 Player $2 is not in a faction!\n'"
+	return
+fi
+
+as_user "screen -p 0 -S $SCREENID -X stuff $'/pm $1 Player $2 is in the faction with ID: $FACTIONID !\n'"
+}
+
+function COMMAND_GETPLAYERBOUNTY() {
+if [ $# -ne 2 ]
+then
+	as_user "screen -p 0 -S $SCREENID -X stuff $'/pm $1 Invalid parameters. Please use !GETPLAYERBOUNTY <playername>\n'"
+	return
+fi
+PLAYER=$2
+if [ ! -e "$PLAYERFILE/$PLAYER" ]
+then
+	as_user "screen -p 0 -S $SCREENID -X stuff $'/pm $1 Wanted player does not exist!\n'"
+	return
+fi
+pl_bounty_calc_bounty
+echo "Bounty for $PLAYER is $PLAYERBOUNTY + Factionbounty of $FACTIONBOUNTY"
+as_user "screen -p 0 -S $SCREENID -X stuff $'/pm $1 Player $PLAYER has $PLAYERBOUNTY Credits on his head and his faction $FACTIONBOUNTY Credits!\n'"
 }
