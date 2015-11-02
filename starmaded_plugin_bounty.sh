@@ -59,16 +59,18 @@ fi
 pl_bounty_write_config_file() {
 CONFIGCREATE="cat > $BOUNTYFILESCONFIG <<_EOF_
 #  Config file for Bounty Plugin
-#  BOUNTYFILEPLAYER:   Here all bounty-entries for players are listed
-#  BOUNTYFILEFACTION:  Here all bounty-entries for factions are listed
-#  BOUNTYADDEDPERKILL: How much bounty gets automatically set onto a player for each kill he performs
-#  BOUNTYGARANTED:     How much a player gets for a kill, even if no bounty is set
-#  BOUNTYFEE:          Percentage of Fee for setting bounty f.e.: 0 for none, 5 for 5%
+#  BOUNTYFILEPLAYER:    Here all bounty-entries for players are listed
+#  BOUNTYFILEFACTION:   Here all bounty-entries for factions are listed
+#  BOUNTYADDEDPERKILL:  How much bounty gets automatically set onto a player for each kill he performs
+#  BOUNTYGARANTED:      How much a player gets for a kill, even if no bounty is set
+#  BOUNTYFEE:           Percentage of Fee for setting bounty f.e.: 0 for none, 5 for 5%
+#  CREDITDROPPERCENTAGE:Percentage of Credits dropped on death. (Dropped means directly transfered to the killer)
 BOUNTYFILEPLAYER=$BOUNTYFILES/player_bounty
 BOUNTYFILEFACTION=$BOUNTYFILES/faction_bounty
 BOUNTYADDEDPERKILL=1000
 BOUNTYGARANTED=1000
 BOUNTYFEE=0
+CREDITDROPPERCENTAGE=10
 _EOF_"
 as_user "$CONFIGCREATE"
 }
@@ -191,6 +193,21 @@ then
 fi
 }
 
+pl_bounty_credit_drops() {
+if [ $CREDITDROPPERCENTAGE -gt 0 ]
+then
+	log_playerinfo
+	CURCREDITS=$(grep "CurrentCredits=" "$PLAYERFILE/$KILLEDPLAYER")
+	CURCREDITS=${CURCREDITS//*=}
+	CURCREDITS=${CURCREDITS// }
+	DROPEDCREDITS=$(($CURCREDITS * 100 / $CREDITDROPPERCENTAGE))
+	CURCREDITS=$(($CURCREDITS - $DROPEDCREDITS))
+	as_user "screen -p 0 -S $SCREENID -X stuff $'/give_credits $KILLEDPLAYER -$DROPEDCREDITS\n'"
+	as_user "sed -i 's/CurrentCredits=.*/CurrentCredits=$CURCREDITS/g' '$PLAYERFILE/$KILLEDPLAYER'"
+	#TODO add it to reward
+fi
+}
+
 pl_bounty_turn() {
 echo "Found Factionturn, now doing bounty turn"
 as_user "mv '$BOUNTYFILEPLAYER' '${BOUNTYFILEPLAYER}_tmp'"
@@ -278,14 +295,14 @@ while [ $i -lt ${#BOUNTYSTRING[@]} ]; do
 	((i++))
 done
 
-if [ $KILLEDFACTION -gt 0 ]
+FACTIONBOUNTY=0
+if [ "$KILLEDFACTION" != "None" ]
 then
 	OLD_IFS=$IFS
 	IFS=$'\n'
 	BOUNTYSTRING=($(grep "FactionWanted=$KILLEDFACTION" "$BOUNTYFILEFACTION"))
 	IFS=$OLD_IFS
 	i=0
-	FACTIONBOUNTY=0
 	while [ $i -lt ${#BOUNTYSTRING[@]} ]; do
 		LINE=(${BOUNTYSTRING[$i]})
 		bounty=${LINE[2]/*=}
@@ -328,6 +345,7 @@ while [ $i -lt ${#BOUNTYSTRING[@]} ]; do
 	((i++))
 done
 
+FACTIONBOUNTY=0
 if [ "$FACTION" != "None" ]
 then
 	OLD_IFS=$IFS
@@ -335,7 +353,6 @@ then
 	BOUNTYSTRING=($(grep "FactionWanted=$FACTION" "$BOUNTYFILEFACTION"))
 	IFS=$OLD_IFS
 	i=0
-	FACTIONBOUNTY=0
 	while [ $i -lt ${#BOUNTYSTRING[@]} ]; do
 		LINE=(${BOUNTYSTRING[$i]})
 		bounty=${LINE[2]/*=}
@@ -348,7 +365,27 @@ then
 		((i++))
 	done
 fi
-echo "Bounty for $PLAYER is $PLAYERBOUNTY + Factionbounty of $FACTIONBOUNTY"
+}
+
+pl_bounty_list_all() {
+OLD_IFS=$IFS
+IFS=$'\n'
+LINES=($(grep "PlayerWanted=" "$BOUNTYFILEPLAYER"))
+PLAYERS=""
+for line in ${LINES[@]}; do
+	PLAYER=${line//*PlayerWanted=}
+	PLAYER=${PLAYER// *}
+	if [[ ! " $PLAYERS " =~ " $PLAYER " ]]
+	then
+		PLAYERS="$PLAYERS $PLAYER"
+	fi
+done
+IFS=$OLD_IFS
+rm /dev/shm/totalbounty.txt 2> /dev/null
+for PLAYER in ${PLAYERS[@]}; do
+	pl_bounty_calc_bounty
+	as_user "echo 'Totalbounty=$(($PLAYERBOUNTY + $FACTIONBOUNTY)) Player=$PLAYER Playerbounty=$PLAYERBOUNTY Factionbounty=$FACTIONBOUNTY' >> /dev/shm/totalbounty.txt"
+done
 }
 
 #Chat commands:
