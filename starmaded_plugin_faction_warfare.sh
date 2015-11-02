@@ -69,7 +69,7 @@ then
 fi
 
 for checkpoint_name in ${CHECKPOINTS[@]} ; do
-	if [ "$(grep "$mine_name" "$FWCHECKPOINTSFILE")" = "" ]
+	if [ "$(grep "$checkpoint_name" "$FWCHECKPOINTSFILE")" == "" ] && [[ "$checkpoint_name" =~ "_WP_" ]]
 	then
 		echo "$checkpoint_name=0" >> "$FWCHECKPOINTSFILE"
 	fi
@@ -369,7 +369,7 @@ function COMMAND_FW_CHECKPOINTS(){
 		for checkpoint in $(cat "$FWCHECKPOINTSFILE"); do
 			checkpoint_status="$checkpoint_status$checkpoint "
 		done
-		as_user "screen -p 0 -S $SCREENID -X stuff $'/pm $1 \"$checkpoint_status[@]\"\n'"
+		as_user "screen -p 0 -S $SCREENID -X stuff $'/pm $1 \"${checkpoint_status[@]}\"\n'"
 	fi
 }
 
