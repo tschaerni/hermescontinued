@@ -512,8 +512,7 @@ create_rankscommands
 				log_initstring $CURRENTSTRING &
 				;;
 			*"$SEARCHFACTIONCHANGE"*)
-				CURRENTSTRING=${CURRENTSTRING//'*'}
-				log_factionchange ${CURRENTSTRING//;} &
+				log_factionchange "$CURRENTSTRING" &
 				;;
 			*"$SEARCHCHANGE"*)
 				log_sectorchange $CURRENTSTRING &
@@ -632,7 +631,6 @@ then
 	PNAME=${PNAME// }
 #echo "Player name is $PNAME"
 	SMNAME=${PLAYERINFO[2]/*SM-NAME: }
-	SMNAME=${SMNAME// }
 #echo "StarMade-Registry name is $SMNAME"
 	PIP=$(echo ${PLAYERINFO[1]} | cut -d\/ -f2)
 #echo "Player IP is $PIP"
@@ -866,22 +864,16 @@ fi
 }
 
 log_factionchange() {
-if [ $# -ge 11 ]
-then
-	NEWFACTION=${11}
-else
-	NEWFACTION=$9
-fi
-#if StarMade Registry is deactivated, we have one entry less. (Only possible on local/test servers)
-if [ "$NEWFACTION" == "current" ]
-then
-	NEWFACTION=${10}
-fi
+PLAYER=${1/*PlS[}
+PLAYER=${PLAYER// *}
+NEWFACTION=${1//*is changing faction (}
+NEWFACTION=${NEWFACTION//*to }
+NEWFACTION=${NEWFACTION//; *}
 if [ "$NEWFACTION" == "0" ]
 then
 	NEWFACTION="None"
 fi
-PLAYER=${3/PlS[}
+
 as_user "sed -i 's/PlayerFaction=.*/PlayerFaction=$NEWFACTION/g' $PLAYERFILE/$PLAYER"
 create_factionfile $NEWFACTION
 }
@@ -971,7 +963,7 @@ else
 			for PLAYER in $PLAYERFILE/*
 			do
 				PLAYER=$(echo $PLAYER | rev | cut -d"/" -f1 | rev )
-				TOTALVOTES=$(echo $ALLVOTES | tr " " "\n" | grep -A1 ">$PLAYER<" | tr "\n" " " | cut -d">" -f4 | cut -d"<" -f1)
+				TOTALVOTES=$(echo $ALLVOTES | tr " " "\n" | grep -A1 "nickname>$PLAYER<" | tr "\n" " " | cut -d">" -f4 | cut -d"<" -f1)
 				VOTINGPOINTS=$(grep "VotingPoints=" $PLAYERFILE/$PLAYER | cut -d= -f2 | tr -d " " )
 				CURRENTVOTES=$(grep "CurrentVotes=" $PLAYERFILE/$PLAYER | cut -d= -f2 | tr -d " " )
 				if [[ ! -z "$TOTALVOTES" ]]
