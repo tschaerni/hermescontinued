@@ -1,6 +1,6 @@
 #!/bin/bash
 #Plugin main function (Every plugin has to have this function, named like the pluin itself)
-
+SPAWNTHREADSTARTED="false"
 faction_warfare() {
 
 SEARCHWIRELESS="[SERVER][ACTIVATION] sent 'true'"
@@ -75,6 +75,16 @@ for checkpoint_name in ${CHECKPOINTS[@]} ; do
 	fi
 done
 
+if [ ! -e "$BEACONSPAWNLISTFILE" ]
+then
+	as_user "echo \"# List of respawning random beacons\" > \"$BEACONSPAWNLISTFILE\""
+fi
+
+if [ "$SPAWNTHREADSTARTED" == "false" ]
+then
+	SPAWNTHREADSTARTED="true"
+	sm_spawn_thread &
+fi
 }
 
 pl_fwf_warfare_round() {
@@ -128,6 +138,11 @@ CONFIGCREATE="cat > $FACTIONWARFARECONFIG <<_EOF_
 #  FUNCTIONALBEACONS: IDs of all avaliable beacons. Its function is described by in the name after the prefix. Example: CB_Scanner_001
 #         have to have their name to beginn with sich an ID and end with a WARFACTIONID.
 #         Example: Mine_6_6_6_part1_10001
+#  BEACONSPAWNLISTFILE: The file where all respawning beacons are listed. Make sure to name them like GN_2_2_2_name <GN_ POS _ Name>
+#  POSSIBLESPAWNFUNCTIONS: The psooible functions for the random spawn. The more often a function is present in the list, the higher is the possibility to spawn that kind
+#  WPEXCHANGERATEFP: Exchangerate between WP and FP (0 to deactivate)
+#  WPEXCHANGERATESILVER: Exchangerate between WP and Silver (0 to deactivate)
+#  WPEXCHANGERATECREDITS: Exchangerate between WP and Credits (0 to deactivate)
 FWCHECKPOINTSFILE=$FACTIONWARFAREFILES/checkpoints.txt
 FWFACTIONFILEPFX=$FACTIONWARFAREFILES/faction
 FWWARPOINTSPERCPROUND=1
@@ -135,6 +150,13 @@ WARFACTIONIDS=( )
 CHECKPOINTS=( )
 FUNCTIONALBEACONS=( )
 DEFAULTBEACONBP=Beacon
+DEFAULTPIRATEBP=Pirate
+SPAWNBEACONLISTFILE=$FACTIONWARFAREFILES/beaconspawns.txt
+SPAWNPOSSIBLEFUNCTIONS=( None )
+SPAWNTIMER=1800
+WPEXCHANGERATEFP=100
+WPEXCHANGERATESILVER=10
+WPEXCHANGERATECREDITS=10000
 _EOF_"
 as_user "$CONFIGCREATE"
 }
@@ -276,11 +298,18 @@ then
 					as_user "sed -i 's/beaconpoints=$old/beaconpoints=$(($old + 1))/g' '$FWFACTIONFILEPFX$FACTIONID.txt'"
 					;;
 				*"Pirate"*)
-					echo "Beacon says: \"Spawn a pirate for me!\""
+					echo "Beacon says: \"Spawn a pirate: $DEFAULTPIRATEBP for me!\""
+					POSITION=$(grep "PlayerLocation=" "$PLAYERFILE/$PLAYER")
+					POSITION=${POSITION/*=}
+					POSITION=${POSITION//,/ }
+					as_user "screen -p 0 -S $SCREENID -X stuff $'/server_message_broadcast info \"Receiving emergency signal of a beacon at ($POSITION). Pirates will be there soon\"\n'"
+					sleep 30
+					as_user "screen -p 0 -S $SCREENID -X stuff $'/spawn_entity $DEFAULTPIRATEBP MOB_${DEFAULTPIRATEBP}_$RANDOM $POSITION -1 true\n'"
 					;;
 				*"Gold"*)
 					echo "Beacon says: \"Give me gold!\""
 					as_user "screen -p 0 -S $SCREENID -X stuff $'/give $PLAYER \"Silver Bar\" 1\n'"
+					as_user "screen -p 0 -S $SCREENID -X stuff $'/pm $PLAYER \"You just got a silver bar!\"\n'"
 					;;
 				*"Faction"*)
 					echo "Beacon says: \"Give my faction FPs!\""
@@ -317,11 +346,22 @@ CHECKPOINTS=${CHECKPOINTS/ )}
 }
 
 sm_get_rnd_beacon_fn(){
-POSSIBLEFUNCTIONS=( Faction Faction Pirate Gold Gold Scanner Random Schnitzel None )
-RNDFUNCTION=$(( $RANDOM % ${#POSSIBLEFUNCTIONS[@]} ))
-RNDFUNCTION=${POSSIBLEFUNCTIONS[$RNDFUNCTION]}
+#POSSIBLEFUNCTIONS=( Faction Faction Pirate Gold Gold Scanner Random Schnitzel None )
+if [ ${#SPAWNPOSSIBLEFUNCTIONS[@]} -ge 1 ]
+then
+	RNDFUNCTION=$(( $RANDOM % ${#SPAWNPOSSIBLEFUNCTIONS[@]} ))
+	RNDFUNCTION=${SPAWNPOSSIBLEFUNCTIONS[$RNDFUNCTION]}
+fi
 }
 
+sm_spawn_thread() {
+#startup sleep
+sleep 30
+while [ -e /proc/$SM_LOG_PID ]; do
+	sm_spawn_round
+	sleep $SPAWNTIMER
+done
+}
 
 sm_spawn_round() {
 # CB_<function>_GN_2_2_2_<nr>_RND
@@ -329,7 +369,7 @@ sm_spawn_round() {
 # FUNCTION = f.e. Scanner
 # _
 # NAME = GENERATEDPREFIX(GN_) POSITION(2_2_2) Nr/Name(_ABC or _1) RANDOMNUMMER(_12857) to prevent abuse
-SPAWNLIST=$(cat $BEACONSPAWNLISTFILE)
+SPAWNLIST=$(grep "GN_" $SPAWNBEACONLISTFILE)
 pl_fwf_reload_checkpoints
 OLD="$(grep "FUNCTIONALBEACONS=" "$FACTIONWARFARECONFIG")"
 NEW=$OLD
@@ -380,6 +420,7 @@ function COMMAND_FW_POINTS(){
 	then
 		as_user "screen -p 0 -S $SCREENID -X stuff $'/pm $1 Invalid parameters. Please use !FW_POINTS <ALL,OWN or factionid>\n'"
 	else
+		param=$(echo $2 | tr [a-z] [A-Z])
 		wps=""
 		if [ ${#WARFACTIONIDS[@]} -gt 0 ]
 			then
@@ -390,7 +431,7 @@ function COMMAND_FW_POINTS(){
 				wps="$wps Faction $fid has $tmp WP"
 			done
 		else
-			if [ "$2" == "OWN" ]
+			if [ "$param" == "OWN" ]
 			then
 				FACTIONID=$(grep "PlayerFaction=" "$PLAYERFILE/$1")
 				FACTIONID=${FACTIONID/*=}
@@ -400,7 +441,7 @@ function COMMAND_FW_POINTS(){
 				tmp=${tmp//*=}
 				tmp=${tmp// }
 				wps="$wps Your Faction has $tmp WP"
-			else if [ "$2" == "ALL" ]
+			else if [ "$param" == "ALL" ]
 			then
 				FACTIONS=($(ls "$FWFACTIONFILEPFX*.txt" 2>/dev/null))
 				for ffile in ${FACTIONS[@]}; do
@@ -438,7 +479,7 @@ function COMMAND_FW_EXCHANGE(){
 #USAGE: !FW_EXCHANGE <fp/gold> <amount>
 	if [ "$#" -ne "3" ]
 	then
-		as_user "screen -p 0 -S $SCREENID -X stuff $'/pm $1 Invalid parameters. Please use !FW_WPEXCHANGE fp/gold nr. Exchange factor 1wp = 100fp or 1wp=1gold\n'"
+		as_user "screen -p 0 -S $SCREENID -X stuff $'/pm $1 Invalid parameters. Please use !FW_WPEXCHANGE fp/silver/credits nr. Exchange factor 1wp = ${WPEXCHANGERATEFP}FP or 1wp=${WPEXCHANGERATESILVER} silver or 1wp=${WPEXCHANGERATECREDITS} Credits\n'"
 	else
 		fid=${WARFACTIONIDS[0]}
 		wptosub=$3
@@ -448,18 +489,23 @@ function COMMAND_FW_EXCHANGE(){
 		new_wpoints=$(($old_wpoints - $wptosub))
 		if [ $new_wpoints -ge 0 ]
 		then
-			if [ $2 = "fp" ]
+			if [ $2 = "fp" ] && [ $WPEXCHANGERATEFP -gt 0 ]
 			then
 				as_user "sed -i 's/currentwp=$old_wpoints/currentwp=$new_wpoints/g' $FWFACTIONFILEPFX$fid.txt"
-				as_user "screen -p 0 -S $SCREENID -X stuff $'/faction_point_add $fid $((100 * $3))\n'"
-				as_user "screen -p 0 -S $SCREENID -X stuff $'/pm $1 Exchanged $wptosub WP into $((100 * $3)) FP\n'"
-			else if [ $2 = "gold" ]
+				as_user "screen -p 0 -S $SCREENID -X stuff $'/faction_point_add $fid $(($WPEXCHANGERATEFP * $3))\n'"
+				as_user "screen -p 0 -S $SCREENID -X stuff $'/pm $1 Exchanged $wptosub WP into $(($WPEXCHANGERATEFP * $3)) FP\n'"
+			else if [ $2 = "silver" ] && [ $WPEXCHANGERATESILVER -gt 0 ]
 			then
 				as_user "sed -i 's/currentwp=$old_wpoints/currentwp=$new_wpoints/g' $FWFACTIONFILEPFX$fid.txt"
-				as_user "screen -p 0 -S $SCREENID -X stuff $'/give $1 gold $3\n'"
-				as_user "screen -p 0 -S $SCREENID -X stuff $'/pm $1 Exchanged $wptosub WP into $3 gold\n'"
+				as_user "screen -p 0 -S $SCREENID -X stuff $'/give $1 silver $(($WPEXCHANGERATESILVER * $3))\n'"
+				as_user "screen -p 0 -S $SCREENID -X stuff $'/pm $1 Exchanged $wptosub WP into $(($WPEXCHANGERATESILVER * $3)) silver\n'"
+			else if [ $2 = "credits" ] && [ $WPEXCHANGERATECREDITS -gt 0 ]
+			then
+				as_user "sed -i 's/currentwp=$old_wpoints/currentwp=$new_wpoints/g' $FWFACTIONFILEPFX$fid.txt"
+				as_user "screen -p 0 -S $SCREENID -X stuff $'/give_credits $1 $(($WPEXCHANGERATECREDITS * $3))\n'"
+				as_user "screen -p 0 -S $SCREENID -X stuff $'/pm $1 Exchanged $wptosub WP into $(($WPEXCHANGERATECREDITS * $3)) ccredits\n'"
 			else
-				as_user "screen -p 0 -S $SCREENID -X stuff $'/pm $1 FW_WPEXCHANGE: second argument has to be either fp or gold!\n'"
+				as_user "screen -p 0 -S $SCREENID -X stuff $'/pm $1 FW_WPEXCHANGE: second argument has to be either fp, silver or credits. Use without parameters to see exchangerates!\n'"
 			fi
 			fi
 		fi
