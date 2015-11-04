@@ -2,6 +2,11 @@
 #Plugin main function (Every plugin has to have this function, named like the pluin itself)
 SPAWNTHREADSTARTED="false"
 faction_warfare() {
+if [ "$SPAWNTHREADSTARTED" == "false" ]
+then
+	SPAWNTHREADSTARTED="true"
+	sm_spawn_thread &
+fi
 
 SEARCHWIRELESS="[SERVER][ACTIVATION] sent 'true'"
 SEARCHFACTIONTURN="[FACTIONMANAGER] faction update took:"
@@ -75,15 +80,9 @@ for checkpoint_name in ${CHECKPOINTS[@]} ; do
 	fi
 done
 
-if [ ! -e "$BEACONSPAWNLISTFILE" ]
+if [ ! -e "$SPAWNBEACONLISTFILE" ]
 then
-	as_user "echo \"# List of respawning random beacons\" > \"$BEACONSPAWNLISTFILE\""
-fi
-
-if [ "$SPAWNTHREADSTARTED" == "false" ]
-then
-	SPAWNTHREADSTARTED="true"
-	sm_spawn_thread &
+	as_user "echo \"# List of respawning random beacons\" > \"$SPAWNBEACONLISTFILE\""
 fi
 }
 
@@ -138,8 +137,9 @@ CONFIGCREATE="cat > $FACTIONWARFARECONFIG <<_EOF_
 #  FUNCTIONALBEACONS: IDs of all avaliable beacons. Its function is described by in the name after the prefix. Example: CB_Scanner_001
 #         have to have their name to beginn with sich an ID and end with a WARFACTIONID.
 #         Example: Mine_6_6_6_part1_10001
-#  BEACONSPAWNLISTFILE: The file where all respawning beacons are listed. Make sure to name them like GN_2_2_2_name <GN_ POS _ Name>
-#  POSSIBLESPAWNFUNCTIONS: The psooible functions for the random spawn. The more often a function is present in the list, the higher is the possibility to spawn that kind
+#  SPAWNBEACONLISTFILE: The file where all respawning beacons are listed. Make sure to name them like GN_2_2_2_name <GN_ POS _ Name>
+#  SPAWNPOSSIBLEFUNCTIONS: The psooible functions for the random spawn. The more often a function is present in the list, the higher is the possibility to spawn that kind
+#  SPAWNTIMER: Respawntimer for Beacons
 #  WPEXCHANGERATEFP: Exchangerate between WP and FP (0 to deactivate)
 #  WPEXCHANGERATESILVER: Exchangerate between WP and Silver (0 to deactivate)
 #  WPEXCHANGERATECREDITS: Exchangerate between WP and Credits (0 to deactivate)
@@ -168,7 +168,6 @@ CONFIGCREATE="cat > $1 <<_EOF_
 #  name: The name of the faction
 #  currentwp: The current warpoints of the faction
 #  beaconpoints: The number of beacons found by this faction
-name=Unnamed
 currentwp=0
 beaconpoints=0
 _EOF_"
@@ -379,8 +378,9 @@ for spawn in $SPAWNLIST; do
 		continue
 	fi
 	POS=${spawn/GN_}
-	POS=${POS%_*}
-	POS=${POS//_/ }
+	#POS=${POS%_*}
+	POS=(${POS//_/ })
+	POS="${POS[0]} ${POS[1]} ${POS[2]}"
 	sm_get_rnd_beacon_fn
 	if [ "$RNDFUNCTION" == "None" ]
 	then
@@ -392,6 +392,7 @@ for spawn in $SPAWNLIST; do
 	NEW="$NEW$ENTITY )"
 
 	BP="${DEFAULTBEACONBP}_$RNDFUNCTION"
+	echo "$BP $ENTITY $POS"
 	as_user "screen -p 0 -S $SCREENID -X stuff $'/spawn_entity $BP $ENTITY $POS -2 false\n'"
 done
 as_user "sed -i 's/$OLD/$NEW/g' '$FACTIONWARFARECONFIG'"
@@ -443,7 +444,7 @@ function COMMAND_FW_POINTS(){
 				wps="$wps Your Faction has $tmp WP"
 			else if [ "$param" == "ALL" ]
 			then
-				FACTIONS=($(ls "$FWFACTIONFILEPFX*.txt" 2>/dev/null))
+				FACTIONS=($(ls "$FWFACTIONFILEPFX"*.txt 2>/dev/null))
 				for ffile in ${FACTIONS[@]}; do
 					fid=${ffile/.txt}
 					fid=${fid/faction}
@@ -506,6 +507,7 @@ function COMMAND_FW_EXCHANGE(){
 				as_user "screen -p 0 -S $SCREENID -X stuff $'/pm $1 Exchanged $wptosub WP into $(($WPEXCHANGERATECREDITS * $3)) ccredits\n'"
 			else
 				as_user "screen -p 0 -S $SCREENID -X stuff $'/pm $1 FW_WPEXCHANGE: second argument has to be either fp, silver or credits. Use without parameters to see exchangerates!\n'"
+			fi
 			fi
 			fi
 		fi
@@ -583,7 +585,8 @@ else
 	pl_fwf_reload_checkpoints
 	as_user "screen -p 0 -S $SCREENID -X stuff $'/pm $1 Begining cleanup, this could take a while\n'"
 	for beacon in $FUNCTIONALBEACONS; do
-		as_user "screen -p 0 -S $SCREENID -X stuff $'/destroy_uid ENTITY_SHIP_$beacon\n'"
+		#as_user "screen -p 0 -S $SCREENID -X stuff $'/destroy_uid ENTITY_SHIP_$beacon\n'"
+		as_user "screen -p 0 -S $SCREENID -X stuff $'/despawn_all $beacon all true\n'"
 	done
 	as_user "sed -i 's/FUNCTIONALBEACONS=.*/FUNCTIONALBEACONS=( )/g' '$FACTIONWARFARECONFIG'"
 	as_user "screen -p 0 -S $SCREENID -X stuff $'/pm $1 Cleaned up the mess. The whole beaconlist got deleted and all matching entities got destroyed\n'"

@@ -517,6 +517,10 @@ create_rankscommands
 			*"$SEARCHCHANGE"*)
 				log_sectorchange $CURRENTSTRING &
 				;;
+			*"$SEARCHFACTIONTURN"*)
+				check_factions &
+				#use ;& to do also the next case statement
+				;&
 			*)
 # Default: pass the CURRENTSTRING to all plugins in list
 				for fn in ${plugin_list[@]}; do
@@ -847,6 +851,7 @@ as_user "sed -i 's/PlayerLastLogin=.*/PlayerLastLogin=$DATE/g' $PLAYERFILE/$LOGI
 LOGON="$LOGINPLAYER logged on at $(date '+%b_%d_%Y_%H.%M.%S') server time"
 as_user "echo $LOGON >> $GUESTBOOK"
 as_user "echo $LOGINPLAYER >> $ONLINELOG"
+as_user "sort $ONLINELOG -o $ONLINELOG"
 }
 log_initstring() {
 TMP="$@"
@@ -998,8 +1003,11 @@ FUNCTIONEXISTS=$?
 write_factionfile() {
 FLASTUPDATE=$(date +%s)
 CREATEFACTION="cat > $FACTIONFILE/$1 <<_EOF_
+FactionName=0
 CreditsInBank=0
 FactionLastUpdate=$FLASTUPDATE
+FactionPoints=0
+FactionKills=0
 _EOF_"
 as_user "$CREATEFACTION"
 }
@@ -1070,6 +1078,8 @@ PlayerLastLogin=0
 PlayerLastCore=0
 PlayerLastUpdate=0
 PlayerLoggedIn=No
+PlayerKills=0
+PlayerDeaths=0
 JustLoggedIn=No
 _EOF_"
 as_user "$PLAYERCREATE"
@@ -1126,6 +1136,7 @@ if [[ ! -f $FACTIONFILE/$1 ]] && [ "$1" != "None" ]
 then
 #	echo "File not found"
 	write_factionfile $1
+	update_faction_info $1
 fi
 }
 create_rankscommands(){
@@ -1220,6 +1231,68 @@ bank_fee (){
 			continue
 		fi
 	done
+}
+
+# Execute for regular activity check of factions
+check_factions() {
+# One week are 604800 seconds
+WEEK=604800
+CURRENTTIME=$(date +%s)
+for i in $FACTIONFILE/*
+do
+	FID=${i//*"/"}
+	if [ $FID -gt 0 ]
+	then
+		as_user "screen -p 0 -S $SCREENID -X stuff $'/faction_point_get $FID\n'"
+	fi
+done
+sleep 2
+for i in $FACTIONFILE/*
+do
+	FID=${i//*"/"}
+	if [ $FID -gt 0 ]
+	then
+		update_faction_info $FID "no"
+		LASTACTIVITY=$(grep "FactionLastUpdate=" "$i")
+		LASTACTIVITY=${LASTACTIVITY/FactionLastUpdate=}
+		if [ $(($CURRENTTIME - $LASTACTIVITY)) -gt $WEEK ]
+		then
+			FPOINTS=$(($FPOINTS * 95 / 100))
+			echo "Faction $FID named $NAME is inactive and looses 5% FP (New FP: $FPOINTS)"
+			as_user "screen -p 0 -S $SCREENID -X stuff $'/faction_point_set $FID $FPOINTS\n'"
+		else if [ $FPOINTS -lt -300 ]
+		then
+			echo "Faction $FID named $NAME has less then -300 FPs, set them back to -300"
+			as_user "screen -p 0 -S $SCREENID -X stuff $'/faction_point_set $FID -300\n'"
+		else if [ $FPOINTS -gt 100000 ]
+		then
+			echo "Faction $FID named $NAME has more then 100000 FPs, set them back to 100000"
+			as_user "screen -p 0 -S $SCREENID -X stuff $'/faction_point_set $FID 100000\n'"
+		fi
+		fi
+		fi
+	fi
+done
+}
+
+update_faction_info() {
+if [ $# -eq 1 ]
+then
+	as_user "screen -p 0 -S $SCREENID -X stuff $'/faction_point_get $1\n'"
+	sleep 1
+fi
+#[SERVER-LOCAL-ADMIN] [ADMIN COMMAND] [SUCCESS] faction points of Knack test now: -52660.0
+#[ADMIN COMMAND] FACTION_POINT_GET from org.schema.schine.network.server.AdminLocalClient@7a886c25 params: [10002]
+FACTIONINFO=$(tac /dev/shm/output.log | grep "\[ADMIN COMMAND\] FACTION_POINT".*"\[$1" -m 1 -B 1)
+if [ -n "$FACTIONINFO" ]
+then
+	FNAME=${FACTIONINFO/*faction points of }
+	FNAME=${FNAME/ now:*}
+	FPOINTS=${FACTIONINFO/*now: }
+	FPOINTS=${FPOINTS/.*}
+	as_user "sed -i 's/FactionName=.*/FactionName=$FNAME/g' '$FACTIONFILE/$1'"
+	as_user "sed -i 's/FactionPoints=.*/FactionPoints=$FPOINTS/g' '$FACTIONFILE/$1'"
+fi
 }
 
 #---------------------------Chat Commands---------------------------------------------
