@@ -418,6 +418,7 @@ echo "Logging started at $(date '+%b_%d_%Y_%H.%M.%S')"
 autovoteretrieval &
 randomhelptips &
 create_rankscommands
+create_creditstatusfile
 # Create the playerfile folder if it doesnt exist
 	mkdir -p $PLAYERFILE
 	OLDBYTECOUNT=0
@@ -519,6 +520,7 @@ create_rankscommands
 				;;
 			*"$SEARCHFACTIONTURN"*)
 				check_factions &
+				check_credits &
 				#use ;& to do also the next case statement
 				;&
 			*)
@@ -1047,6 +1049,8 @@ BANKLOG=$STARTERPATH/logs/bank.log #The file that contains all transactions made
 ONLINELOG=$STARTERPATH/logs/online.log #The file that contains the list of currently online players
 TIPFILE=$STARTERPATH/logs/tips.txt #The file that contains random tips that will be told to players
 FACTIONFILE=$STARTERPATH/factionfiles #The folder that contains individual faction files
+CREDITSTATUSFILE=$STARTERPATH/logs/creditstatus #Contains all relevant infos about absolute creditflow
+CREDITSTATISTICFILE=$STARTERPATH/logs/creditstatistic #Contains snapshots of total credits amount
 #------------------------Game settings----------------------------------------------------------------------------
 VOTECHECKDELAY=10 #The time in seconds between each check of starmade-servers.org
 CREDITSPERVOTE=1000000 # The number of credits a player gets per voting point.
@@ -1112,6 +1116,55 @@ Want to secretly use a command? Try using a command inside a PM to yourself!
 _EOF_"
 as_user "$CREATETIP"
 }
+
+write_creditstatusfile() {
+CREATEFILE="cat > $CREDITSTATUSFILE <<_EOF_
+# ===Creditstatusfile===
+# === Credits avlaibale to refill into the game ===
+CreditsInBank=0
+# === Actual Credit loss ===
+ActualCreditLoss_Sum=0
+ActualCreditLoss_Station=0
+ActualCreditLoss_InactiveFaction=0
+ActualCreditLoss_WeaponMeta=0
+ActualCreditLoss_BankDepositFee=0
+ActualCreditLoss_InactivePlayerBank=0
+ActualCreditLoss_InactivePlayerCredits=0
+ActualCreditLoss_TitanInterest=0
+ActualCreditLoss_Other=0
+# === Actual Credit gain ===
+ActualCreditGain_Sum=0
+ActualCreditGain_NewPlayers=0
+ActualCreditGain_Beacons=0
+ActualCreditGain_Checkpoints=0
+ActualCreditGain_Other=0
+# === Total Credit gain ===
+TotalCreditLoss_Sum=0
+TotalCreditLoss_Station=0
+TotalCreditLoss_InactiveFaction=0
+TotalCreditLoss_WeaponMeta=0
+TotalCreditLoss_BankDepositFee=0
+TotalCreditLoss_InactivePlayerBank=0
+TotalCreditLoss_InactivePlayerCredits=0
+TotalCreditLoss_TitanInterest=0
+TotalCreditLoss_Other=0
+# === Total Credit loss ===
+TotalCreditGain_Sum=0
+TotalCreditGain_NewPlayers=0
+TotalCreditGain_Beacons=0
+TotalCreditGain_Checkpoints=0
+TotalCreditGain_Other=0
+_EOF_"
+as_user "$CREATEFILE"
+}
+
+create_creditstatusfile() {
+if [ ! -e $CREDITSTATUSFILE ]
+then
+	write_creditstatusfile
+fi
+}
+
 create_configpath() {
 if [ ! -e $CONFIGPATH ]
 then
@@ -1302,6 +1355,74 @@ then
 		as_user "sed -i 's/FactionPoints=.*/FactionPoints=$FPOINTS/g' '$FACTIONFILE/$1'"
 	fi
 fi
+}
+
+check_credits() {
+create_creditstatusfile
+#$CREDITSTATUSFILE
+update_credit_statistic
+}
+
+update_credit_statistic() {
+CURRENTTIME=$(date +%s)
+LASTACTIVITY=$(tac $CREDITSTATISTICFILE | grep "Timestamp=" -m 1)
+if [ ! -e $CREDITSTATISTICFILE ] || [ $(($CURRENTTIME - $LASTACTIVITY)) -gt 79200 ]
+then
+	echo "Updating Creditstatistic"
+	pl_bounty_calc_bounty
+	collect_faction_credits
+	collect_player_credits
+	TRADINGCREDITS=$(grep "CreditsInBank=" '$CREDITSTATUSFILE')
+	CREDTILOSS=$(grep "ActualCreditLoss_Sum=" '$CREDITSTATUSFILE')
+	CREDITSGAIN=$(grep "ActualCreditGain_Sum=" '$CREDITSTATUSFILE')
+	USEABLESUMMARY=$(($CREDITSINPLAYERBOUNTY + $CREDITSINFACTIONBOUNTY + $CREDITSINFACTIONBANKS + $CREDITSINPLAYERBANKS + $CREDITSOFPLAYERS))
+	TOTALSUMMARY=$(($USEABLESUMMARY + $CREDITSGAIN + $TRADINGCREDITS - $CREDTILOSS))
+	as_user "echo 'Timestamp=$CURRENTTIME' >> '$CREDITSTATISTICFILE'"
+	as_user "echo 'TotalSummary=$TOTALSUMMARY' >> '$CREDITSTATISTICFILE'"
+	as_user "echo 'UseableSummary=$USEABLESUMMARY' >> '$CREDITSTATISTICFILE'"
+	as_user "echo 'InTradingGuildBank=$TRADINGCREDITS' >> '$CREDITSTATISTICFILE'"
+	as_user "echo 'CreditLoss=$CREDTILOSS' >> '$CREDITSTATISTICFILE'"
+	as_user "echo 'CreditGain=$CREDITSGAIN' >> '$CREDITSTATISTICFILE'"
+	as_user "echo 'InPlayerBounty=$CREDITSINPLAYERBOUNTY' >> '$CREDITSTATISTICFILE'"
+	as_user "echo 'InFactionBounty=$CREDITSINFACTIONBOUNTY' >> '$CREDITSTATISTICFILE'"
+	as_user "echo 'InPlayerBank=$CREDITSINPLAYERBANKS' >> '$CREDITSTATISTICFILE'"
+	as_user "echo 'InFactionBank=$CREDITSINFACTIONBANKS' >> '$CREDITSTATISTICFILE'"
+	as_user "echo 'InPlayerInventory=$CREDITSOFPLAYERS' >> '$CREDITSTATISTICFILE'"
+fi
+}
+
+collect_faction_credits() {
+CREDITSINFACTIONBANKS=0
+#All Faction greater 0
+FACTIONBANKBALANCE=($(cat $FACTIONFILES/1* | grep "CreditsInBank="))
+for credits in ${FACTIONBANKBALANCE[@]}; do
+	credits=${credits//*=}
+	CREDITSINFACTIONBANKS=$(($CREDITSINFACTIONBANKS + $credits))
+done
+}
+
+collect_player_credits() {
+CREDITSINPLAYERBANKS=0
+PLAYERBANKBALANCE=($(cat $PLAYERFILES/* | grep "CreditsInBank="))
+for credits in ${PLAYERBANKBALANCE[@]}; do
+	credits=${credits//*=}
+	if [ $credits -gt 20000000 ]
+	then
+		echo "Someone has $credits in bank"
+	fi
+	CREDITSINPLAYERBANKS=$(($CREDITSINPLAYERBANKS + $credits))
+done
+
+CREDITSOFPLAYERS=0
+PLAYERBANKBALANCE=($(cat $PLAYERFILES/* | grep "CurrentCredits="))
+for credits in ${PLAYERBANKBALANCE[@]}; do
+	credits=${credits//*=}
+	if [ $credits -gt 5000000 ]
+	then
+		echo "Someone has $credits"
+	fi
+	CREDITSOFPLAYERS=$((CREDITSOFPLAYERS + $credits))
+done
 }
 
 #---------------------------Chat Commands---------------------------------------------
@@ -2019,6 +2140,7 @@ case "$1" in
 		sm_stop
 		screen -S $SCREENLOG -X quit
 		echo "Stopping logging"
+		sm_load_plugins
 		sm_start
 	;;
 	backupstar)
