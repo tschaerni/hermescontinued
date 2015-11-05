@@ -1255,18 +1255,24 @@ do
 		update_faction_info $FID "no"
 		LASTACTIVITY=$(grep "FactionLastUpdate=" "$i")
 		LASTACTIVITY=${LASTACTIVITY/FactionLastUpdate=}
+		if [ -z "$FPOINTS" ] || [ -z "$FNAME" ]
+		then
+			echo "Faction $FID File is broken"
+			as_user "echo 'Check Faction $FID' >> '$STARTERPATH/logs/check_factions'"
+			continue
+		fi
 		if [ $(($CURRENTTIME - $LASTACTIVITY)) -gt $WEEK ]
 		then
 			FPOINTS=$(($FPOINTS * 95 / 100))
-			echo "Faction $FID named $NAME is inactive and looses 5% FP (New FP: $FPOINTS)"
+			echo "Faction $FID named $FNAME is inactive and looses 5% FP (New FP: $FPOINTS)"
 			as_user "screen -p 0 -S $SCREENID -X stuff $'/faction_point_set $FID $FPOINTS\n'"
 		else if [ $FPOINTS -lt -300 ]
 		then
-			echo "Faction $FID named $NAME has less then -300 FPs, set them back to -300"
+			echo "Faction $FID named $FNAME has less then -300 FPs, set them back to -300"
 			as_user "screen -p 0 -S $SCREENID -X stuff $'/faction_point_set $FID -300\n'"
 		else if [ $FPOINTS -gt 100000 ]
 		then
-			echo "Faction $FID named $NAME has more then 100000 FPs, set them back to 100000"
+			echo "Faction $FID named $FNAME has more then 100000 FPs, set them back to 100000"
 			as_user "screen -p 0 -S $SCREENID -X stuff $'/faction_point_set $FID 100000\n'"
 		fi
 		fi
@@ -1290,8 +1296,11 @@ then
 	FNAME=${FNAME/ now:*}
 	FPOINTS=${FACTIONINFO/*now: }
 	FPOINTS=${FPOINTS/.*}
-	as_user "sed -i 's/FactionName=.*/FactionName=$FNAME/g' '$FACTIONFILE/$1'"
-	as_user "sed -i 's/FactionPoints=.*/FactionPoints=$FPOINTS/g' '$FACTIONFILE/$1'"
+	if [ -n "$FPOINTS" ] && [ -n "$FNAME" ]
+	then
+		as_user "sed -i 's/FactionName=.*/FactionName=$FNAME/g' '$FACTIONFILE/$1'"
+		as_user "sed -i 's/FactionPoints=.*/FactionPoints=$FPOINTS/g' '$FACTIONFILE/$1'"
+	fi
 fi
 }
 

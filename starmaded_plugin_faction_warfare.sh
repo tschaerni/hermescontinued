@@ -447,7 +447,7 @@ function COMMAND_FW_POINTS(){
 				FACTIONS=($(ls "$FWFACTIONFILEPFX"*.txt 2>/dev/null))
 				for ffile in ${FACTIONS[@]}; do
 					fid=${ffile/.txt}
-					fid=${fid/faction}
+					fid=${fid/*faction}
 					tmp=$(grep "currentwp=" "$FWFACTIONFILEPFX$fid.txt")
 					tmp=${tmp//*=}
 					tmp=${tmp// }
