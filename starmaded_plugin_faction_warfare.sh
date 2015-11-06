@@ -248,8 +248,12 @@ then
 					old_belonger=${old_belonger// }
 					if [ $old_belonger != $FACTIONID ]
 					then
+						FNAME=$(grep "FactionName=" "$FACTIONFILE/$FACTIONID")
+						FNAME=${FNAME/FactionName=}
+						OLDFNAME=$(grep "FactionName=" "$FACTIONFILE/$old_belonger" 2> /dev/null)
+						OLDFNAME=${FNAME/FactionName=}
 						as_user "sed -i 's/$SOURCE=$old_belonger/$SOURCE=$FACTIONID/g' '$FWCHECKPOINTSFILE'"
-						as_user "screen -p 0 -S $SCREENID -X stuff $'/server_message_broadcast info \"Checkpoint $SOURCE from $old_belonger now belongs to Faction $FACTIONID\"\n'"
+						as_user "screen -p 0 -S $SCREENID -X stuff $'/server_message_broadcast info \"Checkpoint $SOURCE from $OLDFNAME (ID:$old_belonger) now belongs to Faction $FNAME (ID:$FACTIONID)\"\n'"
 					fi
 					;;
 				*"Scanner"*)
@@ -290,7 +294,9 @@ then
 					as_user "screen -p 0 -S $SCREENID -X stuff $'/pm $PLAYER Receiving scan data: $SCANRESULT\n'"
 					;;
 				*"Schnitzel"*)
-					as_user "screen -p 0 -S $SCREENID -X stuff $'/server_message_broadcast info \"$PLAYER found the beacon $SOURCE for his faction $FACTIONID\"\n'"
+					FNAME=$(grep "FactionName=" "$FACTIONFILE/$FACTIONID")
+					FNAME=${FNAME/FactionName=}
+					as_user "screen -p 0 -S $SCREENID -X stuff $'/server_message_broadcast info \"$PLAYER found the beacon $SOURCE for his faction $FNAME (ID:$FACTIONID)\"\n'"
 					old=$(grep "beaconpoints=" "$FWFACTIONFILEPFX$FACTIONID.txt")
 					old=${old//*=}
 					old=${old// }
@@ -461,10 +467,12 @@ function COMMAND_FW_POINTS(){
 				FACTIONID=$2
 				if [ -e "$FWFACTIONFILEPFX$FACTIONID.txt" ]
 				then
+					FNAME=$(grep "FactionName=" "$FACTIONFILE/$FACTIONID")
+					FNAME=${FNAME/FactionName=}
 					tmp=$(grep "currentwp=" "$FWFACTIONFILEPFX$FACTIONID.txt")
 					tmp=${tmp//*=}
 					tmp=${tmp// }
-					wps="$wps Faction $FACTIONID has $tmp WP"
+					wps="$wps Faction $FNAME (ID:$FACTIONID) has $tmp WP"
 				else
 					wps="Faction $FACTIONID doesn\'t exist or hasn\'t attended the warfare yet!"
 				fi

@@ -159,7 +159,7 @@ then
 	as_user "screen -p 0 -S $SCREENID -X eval 'stuff \"/shutdown 60\"\015'"
 # Give the server a chance to gracefully shutdown if not kill it and then seg fault it if necessary
 	sleep 60
-	for LOOPNO in {0..30}
+	for LOOPNO in {0..60}
 	do
 		if ps aux | grep $SERVICE | grep -v grep | grep -v rlwrap | grep -v tee | grep port:$PORT >/dev/null
 		then
@@ -618,6 +618,40 @@ else
 fi
 }
 #------------------------------Core logging functions-----------------------------------------
+copy_logs_to_workingdirectory() {
+#If there are still files of us in /dev/shm move them back
+move_logs_to_storagedirectory
+#Factionfiles
+as_user "mkdir /dev/shm/sm_factionfiles"
+as_user "cp '$FACTIONFILE/'* /dev/shm/sm_factionfiles/"
+#Playerfiles
+as_user "mkdir /dev/shm/sm_playerfiles"
+as_user "cp '$PLAYERFILE/'* /dev/shm/sm_playerfiles/"
+
+#Plugin have to copy their files to /dev/shm/sm_* by themself.
+#The move back function moves all sm_* folders back to starterpath/ and removes the sm_ prefix
+}
+
+move_logs_to_storagedirectory() {
+if [ -e "/dev/shm/sm_factionfiles" ]
+then
+	as_user "mv /dev/shm/sm_factionfiles/* '$FACTIONFILE/'"
+	as_user "rmdir /dev/shm/sm_factionfiles"
+fi
+if [ -e "/dev/shm/sm_playerfiles" ]
+then
+	as_user "mv /dev/shm/sm_playerfiles/* '$PLAYERFILE/'"
+	as_user "rmdir /dev/shm/sm_playerfiles"
+fi
+for directory in /dev/shm/sm_*; do
+	if [ -e "$directory" ]
+	then
+		directory=${directory/*\/sm_}
+		as_user "mv /dev/shm/sm_$directory/* '$STARTERPATH/$directory'"
+		as_user "rmdir /dev/shm/sm_$directory"
+	fi
+done
+}
 
 log_playerinfo() {
 #Checks if the player has a mailbox file
@@ -1049,8 +1083,8 @@ BANKLOG=$STARTERPATH/logs/bank.log #The file that contains all transactions made
 ONLINELOG=$STARTERPATH/logs/online.log #The file that contains the list of currently online players
 TIPFILE=$STARTERPATH/logs/tips.txt #The file that contains random tips that will be told to players
 FACTIONFILE=$STARTERPATH/factionfiles #The folder that contains individual faction files
-CREDITSTATUSFILE=$STARTERPATH/logs/creditstatus #Contains all relevant infos about absolute creditflow
-CREDITSTATISTICFILE=$STARTERPATH/logs/creditstatistic #Contains snapshots of total credits amount
+CREDITSTATUSFILE=$STARTERPATH/logs/creditstatus.log #Contains all relevant infos about absolute creditflow
+CREDITSTATISTICFILE=$STARTERPATH/logs/creditstatistic.log #Contains snapshots of total credits amount
 #------------------------Game settings----------------------------------------------------------------------------
 VOTECHECKDELAY=10 #The time in seconds between each check of starmade-servers.org
 CREDITSPERVOTE=1000000 # The number of credits a player gets per voting point.
@@ -1311,7 +1345,10 @@ do
 		if [ -z "$FPOINTS" ] || [ -z "$FNAME" ]
 		then
 			echo "Faction $FID File is broken"
-			as_user "echo 'Check Faction $FID' >> '$STARTERPATH/logs/check_factions'"
+			if [ -z "$(grep "Faction $FID" "$STARTERPATH/logs/check_factions")" ]
+			then
+				as_user "echo 'Check Faction $FID' >> '$STARTERPATH/logs/check_factions'"
+			fi
 			continue
 		fi
 		if [ $(($CURRENTTIME - $LASTACTIVITY)) -gt $WEEK ]
@@ -1342,8 +1379,10 @@ then
 fi
 #[SERVER-LOCAL-ADMIN] [ADMIN COMMAND] [SUCCESS] faction points of Knack test now: -52660.0
 #[ADMIN COMMAND] FACTION_POINT_GET from org.schema.schine.network.server.AdminLocalClient@7a886c25 params: [10002]
+FNAME=""
+FPOINTS=""
 FACTIONINFO=$(tac /dev/shm/output.log | grep "\[ADMIN COMMAND\] FACTION_POINT".*"\[$1" -m 1 -B 1)
-if [ -n "$FACTIONINFO" ]
+if [ -n "$FACTIONINFO" ] && [[ ! "$FACTIONINFO" =~ "\[ERROR\] Faction Not Found" ]]
 then
 	FNAME=${FACTIONINFO/*faction points of }
 	FNAME=${FNAME/ now:*}
@@ -1365,17 +1404,20 @@ update_credit_statistic
 
 update_credit_statistic() {
 CURRENTTIME=$(date +%s)
-LASTACTIVITY=$(tac $CREDITSTATISTICFILE | grep "Timestamp=" -m 1)
-if [ ! -e $CREDITSTATISTICFILE ] || [ $(($CURRENTTIME - $LASTACTIVITY)) -gt 79200 ]
+LASTACTIVITY=$(tac "$CREDITSTATISTICFILE" | grep "Timestamp=" -m 1 2> /dev/null)
+LASTACTIVITY=${LASTACTIVITY/Timestamp=}
+if [ ! -e "$CREDITSTATISTICFILE" ] || [ $(($CURRENTTIME - $LASTACTIVITY)) -gt 79200 ]
 then
 	echo "Updating Creditstatistic"
+	#Set no player, so that pl_bounty_calc_bounty gives back total bounty
+	PLAYER=""
 	pl_bounty_calc_bounty
 	collect_faction_credits
 	collect_player_credits
-	TRADINGCREDITS=$(grep "CreditsInBank=" '$CREDITSTATUSFILE')
-	CREDTILOSS=$(grep "ActualCreditLoss_Sum=" '$CREDITSTATUSFILE')
-	CREDITSGAIN=$(grep "ActualCreditGain_Sum=" '$CREDITSTATUSFILE')
-	USEABLESUMMARY=$(($CREDITSINPLAYERBOUNTY + $CREDITSINFACTIONBOUNTY + $CREDITSINFACTIONBANKS + $CREDITSINPLAYERBANKS + $CREDITSOFPLAYERS))
+	TRADINGCREDITS=$(grep "CreditsInBank=" "$CREDITSTATUSFILE")
+	CREDTILOSS=$(grep "ActualCreditLoss_Sum=" "$CREDITSTATUSFILE")
+	CREDITSGAIN=$(grep "ActualCreditGain_Sum=" "$CREDITSTATUSFILE")
+	USEABLESUMMARY=$(($PLAYERBOUNTY + $FACTIONBOUNTY + $CREDITSINFACTIONBANKS + $CREDITSINPLAYERBANKS + $CREDITSOFPLAYERS))
 	TOTALSUMMARY=$(($USEABLESUMMARY + $CREDITSGAIN + $TRADINGCREDITS - $CREDTILOSS))
 	as_user "echo 'Timestamp=$CURRENTTIME' >> '$CREDITSTATISTICFILE'"
 	as_user "echo 'TotalSummary=$TOTALSUMMARY' >> '$CREDITSTATISTICFILE'"
@@ -1383,8 +1425,8 @@ then
 	as_user "echo 'InTradingGuildBank=$TRADINGCREDITS' >> '$CREDITSTATISTICFILE'"
 	as_user "echo 'CreditLoss=$CREDTILOSS' >> '$CREDITSTATISTICFILE'"
 	as_user "echo 'CreditGain=$CREDITSGAIN' >> '$CREDITSTATISTICFILE'"
-	as_user "echo 'InPlayerBounty=$CREDITSINPLAYERBOUNTY' >> '$CREDITSTATISTICFILE'"
-	as_user "echo 'InFactionBounty=$CREDITSINFACTIONBOUNTY' >> '$CREDITSTATISTICFILE'"
+	as_user "echo 'InPlayerBounty=$PLAYERBOUNTY' >> '$CREDITSTATISTICFILE'"
+	as_user "echo 'InFactionBounty=$FACTIONBOUNTY' >> '$CREDITSTATISTICFILE'"
 	as_user "echo 'InPlayerBank=$CREDITSINPLAYERBANKS' >> '$CREDITSTATISTICFILE'"
 	as_user "echo 'InFactionBank=$CREDITSINFACTIONBANKS' >> '$CREDITSTATISTICFILE'"
 	as_user "echo 'InPlayerInventory=$CREDITSOFPLAYERS' >> '$CREDITSTATISTICFILE'"
@@ -1394,7 +1436,7 @@ fi
 collect_faction_credits() {
 CREDITSINFACTIONBANKS=0
 #All Faction greater 0
-FACTIONBANKBALANCE=($(cat $FACTIONFILES/1* | grep "CreditsInBank="))
+FACTIONBANKBALANCE=($(cat $FACTIONFILE/1* | grep "CreditsInBank="))
 for credits in ${FACTIONBANKBALANCE[@]}; do
 	credits=${credits//*=}
 	CREDITSINFACTIONBANKS=$(($CREDITSINFACTIONBANKS + $credits))
@@ -1403,7 +1445,7 @@ done
 
 collect_player_credits() {
 CREDITSINPLAYERBANKS=0
-PLAYERBANKBALANCE=($(cat $PLAYERFILES/* | grep "CreditsInBank="))
+PLAYERBANKBALANCE=($(cat $PLAYERFILE/* | grep "CreditsInBank="))
 for credits in ${PLAYERBANKBALANCE[@]}; do
 	credits=${credits//*=}
 	if [ $credits -gt 20000000 ]
@@ -1414,7 +1456,7 @@ for credits in ${PLAYERBANKBALANCE[@]}; do
 done
 
 CREDITSOFPLAYERS=0
-PLAYERBANKBALANCE=($(cat $PLAYERFILES/* | grep "CurrentCredits="))
+PLAYERBANKBALANCE=($(cat $PLAYERFILE/* | grep "CurrentCredits="))
 for credits in ${PLAYERBANKBALANCE[@]}; do
 	credits=${credits//*=}
 	if [ $credits -gt 5000000 ]

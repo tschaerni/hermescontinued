@@ -324,12 +324,12 @@ echo "Bounty for $KILLEDPLAYER is $PLAYERBOUNTY + Factionbounty of $FACTIONBOUNT
 }
 
 pl_bounty_calc_bounty() {
-FACTION=$(grep "PlayerFaction=" "$PLAYERFILE/$PLAYER")
+FACTION=$(grep "PlayerFaction=" "$PLAYERFILE/$PLAYER" 2> /dev/null)
 FACTION=${FACTION/*=}
 FACTION=${FACTION// }
 OLD_IFS=$IFS
 IFS=$'\n'
-BOUNTYSTRING=($(grep "PlayerWanted=$PLAYER" "$BOUNTYFILEPLAYER"))
+BOUNTYSTRING=($(grep "PlayerWanted=$PLAYER" "$BOUNTYFILEPLAYER" 2> /dev/null))
 IFS=$OLD_IFS
 i=0
 PLAYERBOUNTY=0
@@ -350,7 +350,7 @@ if [ "$FACTION" != "None" ]
 then
 	OLD_IFS=$IFS
 	IFS=$'\n'
-	BOUNTYSTRING=($(grep "FactionWanted=$FACTION" "$BOUNTYFILEFACTION"))
+	BOUNTYSTRING=($(grep "FactionWanted=$FACTION" "$BOUNTYFILEFACTION" 2> /dev/null))
 	IFS=$OLD_IFS
 	i=0
 	while [ $i -lt ${#BOUNTYSTRING[@]} ]; do
@@ -474,7 +474,7 @@ fi
 }
 
 function COMMAND_GETFACTIONID() {
-if [ $# -ne 1 ]
+if [ $# -ne 2 ]
 then
 	as_user "screen -p 0 -S $SCREENID -X stuff $'/pm $1 Invalid parameters. Please use !GETFACTIONID <playername>\n'"
 	return
@@ -492,8 +492,9 @@ then
 	as_user "screen -p 0 -S $SCREENID -X stuff $'/pm $1 Player $2 is not in a faction!\n'"
 	return
 fi
-
-as_user "screen -p 0 -S $SCREENID -X stuff $'/pm $1 Player $2 is in the faction with ID: $FACTIONID !\n'"
+FNAME=$(grep "FactionName=" "$FACTIONFILE/$FACTIONID")
+FNAME=${FNAME/FactionName=}
+as_user "screen -p 0 -S $SCREENID -X stuff $'/pm $1 Player $2 is in the faction $FNAME (ID:$FACTIONID) !\n'"
 }
 
 function COMMAND_GETPLAYERBOUNTY() {
