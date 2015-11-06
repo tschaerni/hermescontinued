@@ -1382,7 +1382,7 @@ fi
 FNAME=""
 FPOINTS=""
 FACTIONINFO=$(tac /dev/shm/output.log | grep "\[ADMIN COMMAND\] FACTION_POINT".*"\[$1" -m 1 -B 1)
-if [ -n "$FACTIONINFO" ] && [[ ! "$FACTIONINFO" =~ "\[ERROR\] Faction Not Found" ]]
+if [ -n "$FACTIONINFO" ] && [[ ! "$FACTIONINFO" =~ "\[ERROR\] Faction Not Found" ]] && [[ "$FACTIONINFO" =~ "\[SUCCESS\] faction points of" ]]
 then
 	FNAME=${FACTIONINFO/*faction points of }
 	FNAME=${FNAME/ now:*}
@@ -1404,7 +1404,7 @@ update_credit_statistic
 
 update_credit_statistic() {
 CURRENTTIME=$(date +%s)
-LASTACTIVITY=$(tac "$CREDITSTATISTICFILE" | grep "Timestamp=" -m 1 2> /dev/null)
+LASTACTIVITY=$(tac "$CREDITSTATISTICFILE" 2> /dev/null | grep "Timestamp=" -m 1)
 LASTACTIVITY=${LASTACTIVITY/Timestamp=}
 if [ ! -e "$CREDITSTATISTICFILE" ] || [ $(($CURRENTTIME - $LASTACTIVITY)) -gt 79200 ]
 then
@@ -1415,8 +1415,11 @@ then
 	collect_faction_credits
 	collect_player_credits
 	TRADINGCREDITS=$(grep "CreditsInBank=" "$CREDITSTATUSFILE")
+	TRADINGCREDITS=${TRADINGCREDITS/CreditsInBank=}
 	CREDTILOSS=$(grep "ActualCreditLoss_Sum=" "$CREDITSTATUSFILE")
+	CREDITLOSS=${CREDITLOSS/ActualCreditLoss_Sum=}
 	CREDITSGAIN=$(grep "ActualCreditGain_Sum=" "$CREDITSTATUSFILE")
+	CREDITSGAIN=${CREDITSGAIN/ActualCreditGain_Sum=}
 	USEABLESUMMARY=$(($PLAYERBOUNTY + $FACTIONBOUNTY + $CREDITSINFACTIONBANKS + $CREDITSINPLAYERBANKS + $CREDITSOFPLAYERS))
 	TOTALSUMMARY=$(($USEABLESUMMARY + $CREDITSGAIN + $TRADINGCREDITS - $CREDTILOSS))
 	as_user "echo 'Timestamp=$CURRENTTIME' >> '$CREDITSTATISTICFILE'"

@@ -251,7 +251,7 @@ then
 						FNAME=$(grep "FactionName=" "$FACTIONFILE/$FACTIONID")
 						FNAME=${FNAME/FactionName=}
 						OLDFNAME=$(grep "FactionName=" "$FACTIONFILE/$old_belonger" 2> /dev/null)
-						OLDFNAME=${FNAME/FactionName=}
+						OLDFNAME=${OLDFNAME/FactionName=}
 						as_user "sed -i 's/$SOURCE=$old_belonger/$SOURCE=$FACTIONID/g' '$FWCHECKPOINTSFILE'"
 						as_user "screen -p 0 -S $SCREENID -X stuff $'/server_message_broadcast info \"Checkpoint $SOURCE from $OLDFNAME (ID:$old_belonger) now belongs to Faction $FNAME (ID:$FACTIONID)\"\n'"
 					fi
