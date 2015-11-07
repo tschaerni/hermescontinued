@@ -1331,6 +1331,7 @@ do
 	if [ $FID -gt 0 ]
 	then
 		as_user "screen -p 0 -S $SCREENID -X stuff $'/faction_point_get $FID\n'"
+		sleep 0.1
 	fi
 done
 sleep 2
@@ -1382,7 +1383,7 @@ fi
 FNAME=""
 FPOINTS=""
 FACTIONINFO=$(tac /dev/shm/output.log | grep "\[ADMIN COMMAND\] FACTION_POINT".*"\[$1" -m 1 -B 1)
-if [ -n "$FACTIONINFO" ] && [[ ! "$FACTIONINFO" =~ "\[ERROR\] Faction Not Found" ]] && [[ "$FACTIONINFO" =~ "\[SUCCESS\] faction points of" ]]
+if [ -n "$FACTIONINFO" ] && [[ "$FACTIONINFO" =~ " faction points of" ]]
 then
 	FNAME=${FACTIONINFO/*faction points of }
 	FNAME=${FNAME/ now:*}
@@ -1416,17 +1417,17 @@ then
 	collect_player_credits
 	TRADINGCREDITS=$(grep "CreditsInBank=" "$CREDITSTATUSFILE")
 	TRADINGCREDITS=${TRADINGCREDITS/CreditsInBank=}
-	CREDTILOSS=$(grep "ActualCreditLoss_Sum=" "$CREDITSTATUSFILE")
+	CREDITLOSS=$(grep "ActualCreditLoss_Sum=" "$CREDITSTATUSFILE")
 	CREDITLOSS=${CREDITLOSS/ActualCreditLoss_Sum=}
 	CREDITSGAIN=$(grep "ActualCreditGain_Sum=" "$CREDITSTATUSFILE")
 	CREDITSGAIN=${CREDITSGAIN/ActualCreditGain_Sum=}
 	USEABLESUMMARY=$(($PLAYERBOUNTY + $FACTIONBOUNTY + $CREDITSINFACTIONBANKS + $CREDITSINPLAYERBANKS + $CREDITSOFPLAYERS))
-	TOTALSUMMARY=$(($USEABLESUMMARY + $CREDITSGAIN + $TRADINGCREDITS - $CREDTILOSS))
+	TOTALSUMMARY=$(($USEABLESUMMARY + $CREDITSGAIN + $TRADINGCREDITS - $CREDITLOSS))
 	as_user "echo 'Timestamp=$CURRENTTIME' >> '$CREDITSTATISTICFILE'"
 	as_user "echo 'TotalSummary=$TOTALSUMMARY' >> '$CREDITSTATISTICFILE'"
 	as_user "echo 'UseableSummary=$USEABLESUMMARY' >> '$CREDITSTATISTICFILE'"
 	as_user "echo 'InTradingGuildBank=$TRADINGCREDITS' >> '$CREDITSTATISTICFILE'"
-	as_user "echo 'CreditLoss=$CREDTILOSS' >> '$CREDITSTATISTICFILE'"
+	as_user "echo 'CreditLoss=$CREDITLOSS' >> '$CREDITSTATISTICFILE'"
 	as_user "echo 'CreditGain=$CREDITSGAIN' >> '$CREDITSTATISTICFILE'"
 	as_user "echo 'InPlayerBounty=$PLAYERBOUNTY' >> '$CREDITSTATISTICFILE'"
 	as_user "echo 'InFactionBounty=$FACTIONBOUNTY' >> '$CREDITSTATISTICFILE'"
@@ -2204,6 +2205,11 @@ case "$1" in
 	;;
 	bankfee)
 		bank_fee
+	;;
+	check)
+		sm_load_plugins
+		check_credits
+		check_factions
 	;;
 	debug)
 		echo ${@:2}
