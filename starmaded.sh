@@ -472,6 +472,7 @@ create_creditstatusfile
 		SEARCHFACTIONCHANGE="is changing faction ("
 		SEARCHFACTIONTURN="[FACTIONMANAGER] faction update took:"
 		SEARCHCHANGE="has players attached. Doing Sector Change for PlS"
+		SEARCHPLANETGRAVITY="GRAVITY UPDATE:::::: GRAV\[ENTITY_PLANET"
 # Linenumber is set to zero and the a while loop runs through every present array in Linestring
 		LINENUMBER=0
 		while [ -n "${LINESTRING[$LINENUMBER]+set}" ]
@@ -517,6 +518,9 @@ create_creditstatusfile
 				;;
 			*"$SEARCHCHANGE"*)
 				log_sectorchange $CURRENTSTRING &
+				;;
+			*"$SEARCHPLANETGRAVITY"*)
+				log_planetgravity $CURRENTSTRING &
 				;;
 			*"$SEARCHFACTIONTURN"*)
 				check_factions &
@@ -919,7 +923,7 @@ as_user "sed -i 's/PlayerFaction=.*/PlayerFaction=$NEWFACTION/g' $PLAYERFILE/$PL
 create_factionfile $NEWFACTION
 }
 
-log_sectorchange(){
+log_sectorchange() {
 PLAYER="$@"
 PLAYER=${PLAYER//*PlS[}
 PLAYER=${PLAYER// *}
@@ -928,6 +932,21 @@ SECTOR=${SECTOR//*(}
 SECTOR=${SECTOR/)}
 SECTOR=${SECTOR// }
 as_user "sed -i 's/PlayerLocation=.*/PlayerLocation=$SECTOR/g' $PLAYERFILE/$PLAYER"
+}
+
+log_planetgravity() {
+TMP="$@"
+SOURCE=${TMP/[*}
+#SOURCE could be Ship or PlayerCharacter
+if [ "$SOURCE" == "Ship" ]
+then
+	SHIP=${TMP//]*}
+	SHIP=${SHIP/Ship[}
+	PLANET=${TMP/*GRAV[}
+	PLANET=${PLANET/(*}
+	TIMESTAMP=$(date '+%b_%d_%Y_%H.%M.%S')
+	as_user "echo '$TIMESTAMP Ship $SHIP entered gravity of planet $PLANET' >> '$PLANETGRAVLOG'"
+fi
 }
 
 #------------------------------Game mechanics-----------------------------------------
@@ -1085,6 +1104,7 @@ TIPFILE=$STARTERPATH/logs/tips.txt #The file that contains random tips that will
 FACTIONFILE=$STARTERPATH/factionfiles #The folder that contains individual faction files
 CREDITSTATUSFILE=$STARTERPATH/logs/creditstatus.log #Contains all relevant infos about absolute creditflow
 CREDITSTATISTICFILE=$STARTERPATH/logs/creditstatistic.log #Contains snapshots of total credits amount
+PLANETGRAVLOG=$STARTERPATH/logs/planetgravity.log #Contains all ships that entered the gravity of a planet once"
 #------------------------Game settings----------------------------------------------------------------------------
 VOTECHECKDELAY=10 #The time in seconds between each check of starmade-servers.org
 CREDITSPERVOTE=1000000 # The number of credits a player gets per voting point.
@@ -1440,31 +1460,41 @@ fi
 collect_faction_credits() {
 CREDITSINFACTIONBANKS=0
 #All Faction greater 0
-FACTIONBANKBALANCE=($(cat $FACTIONFILE/1* | grep "CreditsInBank="))
-for credits in ${FACTIONBANKBALANCE[@]}; do
-	credits=${credits//*=}
+FACTIONBANKBALANCE=($(grep "CreditsInBank=" "$FACTIONFILE"/1*)
+for line in ${FACTIONBANKBALANCE[@]}; do
+	credits=${line//*=}
+	if [ $credits -gt 40000000 ]
+	then
+		name=${line/:CreditsInBank=*}
+		name=${name//*\/}
+		echo "Faction $name has $credits in bank"
+	fi
 	CREDITSINFACTIONBANKS=$(($CREDITSINFACTIONBANKS + $credits))
 done
 }
 
 collect_player_credits() {
 CREDITSINPLAYERBANKS=0
-PLAYERBANKBALANCE=($(cat $PLAYERFILE/* | grep "CreditsInBank="))
-for credits in ${PLAYERBANKBALANCE[@]}; do
-	credits=${credits//*=}
+PLAYERBANKBALANCE=($(grep "CreditsInBank=" "$PLAYERFILE"/*))
+for line in ${PLAYERBANKBALANCE[@]}; do
+	credits=${line//*=}
 	if [ $credits -gt 20000000 ]
 	then
-		echo "Someone has $credits in bank"
+		name=${line/:CreditsInBank=*}
+		name=${name//*\/}
+		echo "$name has $credits in bank"
 	fi
 	CREDITSINPLAYERBANKS=$(($CREDITSINPLAYERBANKS + $credits))
 done
 
 CREDITSOFPLAYERS=0
-PLAYERBANKBALANCE=($(cat $PLAYERFILE/* | grep "CurrentCredits="))
-for credits in ${PLAYERBANKBALANCE[@]}; do
-	credits=${credits//*=}
+PLAYERINVBALANCE=($(grep "CurrentCredits=" "$PLAYERFILE"/*))
+for line in ${PLAYERINVBALANCE[@]}; do
+	credits=${line//*=}
 	if [ $credits -gt 5000000 ]
 	then
+		name=${line/:CurrentCredits=*}
+		name=${name//*\/}
 		echo "Someone has $credits"
 	fi
 	CREDITSOFPLAYERS=$((CREDITSOFPLAYERS + $credits))
