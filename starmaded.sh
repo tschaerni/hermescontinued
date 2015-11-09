@@ -476,8 +476,6 @@ create_creditstatusfile
 			LINESTRING=()
 		fi
 # Search strings that the logging function is looking to trigger events
-		SEARCHWARNING="WARNING"
-		SEARCHRAIL="[RAIL]"
 		SEARCHLOGIN="[SERVER][LOGIN] login received. returning login info for RegisteredClient: "
 		SEARCHREMOVE="[SERVER][DISCONNECT] Client 'RegisteredClient:"
 		SEARCHCHAT="[CHANNELROUTER] RECEIVED MESSAGE ON Server(0): [CHAT]"
@@ -487,7 +485,7 @@ create_creditstatusfile
 		SEARCHFACTIONCHANGE="is changing faction ("
 		SEARCHFACTIONTURN="[FACTIONMANAGER] faction update took:"
 		SEARCHCHANGE="has players attached. Doing Sector Change for PlS"
-		SEARCHPLANETGRAVITY="GRAVITY UPDATE:::::: GRAV\[ENTITY_PLANET"
+		SEARCHPLANETGRAVITY="GRAVITY UPDATE:::::: GRAV[ENTITY_PLANET"
 # Linenumber is set to zero and the a while loop runs through every present array in Linestring
 		LINENUMBER=0
 		while [ -n "${LINESTRING[$LINENUMBER]+set}" ]
@@ -497,12 +495,6 @@ create_creditstatusfile
 		((LINENUMBER++))
 # Case statement here is used to match search strings from the current array or line in linestring
 		case "$CURRENTSTRING" in
-			*"$SEARCHWARNING"*)
-				continue
-				;;
-			*"$SEARCHRAIL"*)
-				continue
-				;;
 			*"$SEARCHLOGIN"*)
 #				echo "Login detected"
 #				echo $CURRENTSTRING

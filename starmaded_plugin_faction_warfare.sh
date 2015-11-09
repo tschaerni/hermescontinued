@@ -313,14 +313,22 @@ then
 					;;
 				*"Gold"*)
 					echo "Beacon says: \"Give me gold!\""
-					as_user "screen -p 0 -S $SCREENID -X stuff $'/give $PLAYER \"Silver Bar\" 1\n'"
-					as_user "screen -p 0 -S $SCREENID -X stuff $'/pm $PLAYER \"You just got a silver bar!\"\n'"
+					as_user "screen -p 0 -S $SCREENID -X stuff $'/give $PLAYER \"Silver Bar\" 3\n'"
+					as_user "screen -p 0 -S $SCREENID -X stuff $'/pm $PLAYER \"You just got 3 silver bars!\"\n'"
 					;;
 				*"Faction"*)
 					echo "Beacon says: \"Give my faction FPs!\""
 					as_user "screen -p 0 -S $SCREENID -X stuff $'/pm $PLAYER \"Your faction got 100FP from a Factionbeacon!\"\n'"
 					as_user "screen -p 0 -S $SCREENID -X stuff $'/faction_point_add $FACTIONID 100\n'"
 					;;
+				*"Vanta"*)
+					echo "Beacon says: \"Give me vanta!\""
+					as_user "screen -p 0 -S $SCREENID -X stuff $'/give $PLAYER \"Vanta\" 10\n'"
+					as_user "screen -p 0 -S $SCREENID -X stuff $'/pm $PLAYER \"You just got 10 Vanta blocks!\"\n'"
+				*"Credit"*)
+					echo "Beacon says: \"Give me credits!\""
+					as_user "screen -p 0 -S $SCREENID -X stuff $'/give_credits $PLAYER 50000\n'"
+					as_user "screen -p 0 -S $SCREENID -X stuff $'/pm $PLAYER \"You just got 10 Vanta blocks!\"\n'"
 				*"Random"*)
 					echo "Beacon says: \"Do a random thing!\""
 					;;
