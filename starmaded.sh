@@ -128,7 +128,7 @@ else
 	FILTER=""
 	if [ -e "$STARTERPATH/starmaded_worklog_filter.txt" ]
 	then
-		FILTER="| grep -f $STARTERPATH/starmaded_worklog_filter.txt | tee /dev/shm/output_work.log"
+		FILTER="| grep --line-buffered -f $STARTERPATH/starmaded_worklog_filter.txt | tee /dev/shm/output_work.log"
 	fi
 # Execute the server in a screen while using tee to move the Standard and Error Output to output.log
 	cd $STARTERPATH/StarMade
@@ -1475,7 +1475,7 @@ fi
 collect_faction_credits() {
 CREDITSINFACTIONBANKS=0
 #All Faction greater 0
-FACTIONBANKBALANCE=($(grep "CreditsInBank=" "$FACTIONFILE"/1*)
+FACTIONBANKBALANCE=($(grep "CreditsInBank=" "$FACTIONFILE"/1*))
 for line in ${FACTIONBANKBALANCE[@]}; do
 	credits=${line//*=}
 	if [ $credits -gt 40000000 ]
