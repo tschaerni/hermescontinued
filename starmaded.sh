@@ -109,22 +109,31 @@ else
 # Check to see if logs and other directories exists and create them if they do not
 	sm_checkdir
 # Make sure screen log is shut down just in case it is still running
-    if ps aux | grep -v grep | grep $SCREENLOG >/dev/null
-    then
+	if ps aux | grep -v grep | grep $SCREENLOG >/dev/null
+	then
 		echo "Screenlog detected terminating"
 		PID=$(ps aux | grep -v grep | grep $SCREENLOG | awk '{print $2}')
 		kill $PID
-    fi
+	fi
 # Check for the output.log and if it is there move it and save it with a time stamp
-    if [ -e /dev/shm/output.log ]
-    then
+	if [ -e /dev/shm/output.log ]
+	then
 		MOVELOG=$STARTERPATH/oldlogs/output_$(date '+%b_%d_%Y_%H.%M.%S').log
 		as_user "mv /dev/shm/output.log $MOVELOG"
-    fi
+	fi
+	if [ -e /dev/shm/output_work.log ]
+	then
+		rm /dev/shm/output_work.log
+	fi
+	FILTER=""
+	if [ -e "$STARTERPATH/starmaded_worklog_filter.txt" ]
+	then
+		FILTER="| grep -f $STARTERPATH/starmaded_worklog_filter.txt | tee /dev/shm/output_work.log"
+	fi
 # Execute the server in a screen while using tee to move the Standard and Error Output to output.log
 	cd $STARTERPATH/StarMade
 	#as_user "screen -dmS $SCREENID -m sh -c 'ionice -c2 -n0 nice -n -10 rlwrap java -Xmx$MAXMEMORY -Xms$MINMEMORY -XX:ParallelGCThreads=4 -d64 -jar $SERVICE -server -port:$PORT 2>&1 | tee /dev/shm/output.log'"
-	as_user "screen -dmS $SCREENID -m sh -c 'nice -n 10 rlwrap java -Xmx$MAXMEMORY -Xms$MINMEMORY -XX:ParallelGCThreads=8 -Xincgc -d64 -Dcom.sun.management.jmxremote.host=78.46.81.50 -Dcom.sun.management.jmxremote.port=3333 -Dcom.sun.management.jmxremote.rmi.port=3333 -Dcom.sun.management.jmxremote.ssl=false -Dcom.sun.management.jmxremote.authenticate=false -jar $SERVICE -server -port:$PORT 2>&1 | tee /dev/shm/output.log'"
+	as_user "screen -dmS $SCREENID -m sh -c 'nice -n 10 rlwrap java -Xmx$MAXMEMORY -Xms$MINMEMORY -XX:ParallelGCThreads=8 -Xincgc -d64 -Dcom.sun.management.jmxremote.host=78.46.81.50 -Dcom.sun.management.jmxremote.port=3333 -Dcom.sun.management.jmxremote.rmi.port=3333 -Dcom.sun.management.jmxremote.ssl=false -Dcom.sun.management.jmxremote.authenticate=false -jar $SERVICE -server -port:$PORT 2>&1 | tee /dev/shm/output.log $FILTER'"
 # Created a limited loop to see when the server starts
     for LOOPNO in {0..7}
 	do
@@ -422,12 +431,18 @@ create_creditstatusfile
 # Create the playerfile folder if it doesnt exist
 	mkdir -p $PLAYERFILE
 	OLDBYTECOUNT=0
+	if [ -e /dev/shm/output_work.log ]
+	then
+		LOGFILE="/dev/shm/output_work.log"
+	else
+		LOGFILE="/dev/shm/output.log"
+	fi
 # This while loop runs as long as starmade stays running
 	while (ps aux | grep $SERVICE | grep -v -e grep -e tee | grep port:$PORT >/dev/null)
 	do
 		sleep 0.1
 #First check if the byte-count changed, because wc -c ist over 50 times faster than wc -l
-		BYTECOUNT=$(wc -c /dev/shm/output.log)
+		BYTECOUNT=$(wc -c $LOGFILE)
 		BYTECOUNT=${BYTECOUNT// *}
 		if [ "$BYTECOUNT" -eq "$OLDBYTECOUNT" ]
 		then
@@ -435,7 +450,7 @@ create_creditstatusfile
 		fi
 		OLDBYTECOUNT=$BYTECOUNT
 # Uses Cat to calculate the number of lines in the log file
-		NUMOFLINES=$(wc -l /dev/shm/output.log)
+		NUMOFLINES=$(wc -l $LOGFILE)
 		NUMOFLINES=${NUMOFLINES// *}
 # In case Linestart does not have a value give it an interger value of 1.  The prevents a startup error on the script.
 		if [ -z "$LINESTART" ]
@@ -453,7 +468,7 @@ create_creditstatusfile
 # This sets the field seperator to use \n next line instead of next space.  This makes it so the array is a whole sentence not a word
 			IFS=$'\n'
 # Linestring is stored as an array of every line in the log
-			LINESTRING=( $(awk "NR==$LINESTART, NR==$NUMOFLINES" /dev/shm/output.log) )
+			LINESTRING=( $(awk "NR==$LINESTART, NR==$NUMOFLINES" $LOGFILE) )
 			IFS=$OLD_IFS
 			LINESTART=$NUMOFLINES
 #			echo "$LINESTART is adjusted linestart"
@@ -1104,7 +1119,7 @@ TIPFILE=$STARTERPATH/logs/tips.txt #The file that contains random tips that will
 FACTIONFILE=$STARTERPATH/factionfiles #The folder that contains individual faction files
 CREDITSTATUSFILE=$STARTERPATH/logs/creditstatus.log #Contains all relevant infos about absolute creditflow
 CREDITSTATISTICFILE=$STARTERPATH/logs/creditstatistic.log #Contains snapshots of total credits amount
-PLANETGRAVLOG=$STARTERPATH/logs/planetgravity.log #Contains all ships that entered the gravity of a planet once"
+PLANETGRAVLOG=$STARTERPATH/logs/planetgravity.log #Contains all ships that entered the gravity of a planet once
 #------------------------Game settings----------------------------------------------------------------------------
 VOTECHECKDELAY=10 #The time in seconds between each check of starmade-servers.org
 CREDITSPERVOTE=1000000 # The number of credits a player gets per voting point.

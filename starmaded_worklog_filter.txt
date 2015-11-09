@@ -1,0 +1,12 @@
+\[SERVER\]\[LOGIN\] login received. returning login info for RegisteredClient: 
+\[SERVER\]\[DISCONNECT\] Client 'RegisteredClient:
+\[CHANNELROUTER\] RECEIVED MESSAGE ON Server(0): \[CHAT\]
+\[ADMIN COMMAND\]
+SPAWNING NEW CHARACTER FOR PlS
+is changing faction (
+\[FACTIONMANAGER\] faction update took:
+has players attached. Doing Sector Change for PlS
+GRAVITY UPDATE:::::: GRAV\[ENTITY_PLANET
+\[SERVER\]\[ACTIVATION\] sent 'true'
+starting gravity change DONE: source:
+Announcing kill:
