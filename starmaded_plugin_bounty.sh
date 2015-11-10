@@ -159,6 +159,7 @@ then
 	if [ "$KILLERFACTION" == "None" ] || [ "$KILLERFACTION" != "$KILLEDFACTION" ]
 	then
 		pl_bounty_calc_take_bounty
+		pl_bounty_credit_drops
 		BOUNTY=$(($PLAYERBOUNTY + $FACTIONBOUNTY))
 		if [ $BOUNTY -le 0 ]
 		then
@@ -167,9 +168,9 @@ then
 		fi
 		BANKBALANCE=$(grep "CreditsInBank=" "$PLAYERFILE/$KILLERNAME")
 		BANKBALANCE=${BANKBALANCE/*=}
-		NEW=$(($BANKBALANCE + $BOUNTY))
+		NEW=$(($BANKBALANCE + $BOUNTY + $DROPEDCREDITS))
 		as_user "sed -i 's/CreditsInBank=.*/CreditsInBank=$NEW/g' '$PLAYERFILE/$KILLERNAME'"
-		as_user "screen -p 0 -S $SCREENID -X stuff $'/pm $KILLERNAME You got $BOUNTY Credits transfered onto your bankaccount for killing ${KILLEDPLAYER}!\n'"
+		as_user "screen -p 0 -S $SCREENID -X stuff $'/pm $KILLERNAME You got $BOUNTY Credits from bounty and $DROPEDCREDITS Credits from creditdrop transfered onto your bankaccount for killing ${KILLEDPLAYER}!\n'"
 	fi
 fi
 }
@@ -180,6 +181,7 @@ then
 	if [ -e "$FACTIONFILE/$KILLERFACTION" ]
 	then
 		pl_bounty_calc_take_bounty
+		pl_bounty_credit_drops
 		BOUNTY=$(($PLAYERBOUNTY + $FACTIONBOUNTY))
 		if [ $BOUNTY -le 0 ]
 		then
@@ -187,13 +189,14 @@ then
 		fi
 		BANKBALANCE=$(grep "CreditsInBank=" "$FACTIONFILE/$KILLERFACTION")
 		BANKBALANCE=${BANKBALANCE/*=}
-		NEW=$(($BANKBALANCE + $BOUNTY))
+		NEW=$(($BANKBALANCE + $BOUNTY + $DROPEDCREDITS))
 		as_user "sed -i 's/CreditsInBank=.*/CreditsInBank=$NEW/g' '$FACTIONFILE/$KILLERFACTION'"
 	fi
 fi
 }
 
 pl_bounty_credit_drops() {
+DROPEDCREDITS=0
 if [ $CREDITDROPPERCENTAGE -gt 0 ]
 then
 	log_playerinfo

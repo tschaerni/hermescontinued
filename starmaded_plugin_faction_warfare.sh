@@ -95,7 +95,7 @@ pl_fwf_reload_checkpoints
 if [ ${#WARFACTIONIDS[@]} -gt 0 ]
 then
 	for fid in ${WARFACTIONIDS[@]}; do
-		sumowned=$(grep -c "$fid" "$FWCHECKPOINTSFILE")
+		sumowned=$(grep -c "_WP_.*$fid" "$FWCHECKPOINTSFILE")
 		wptoadd=$(($sumowned * $FWWARPOINTSPERCPROUND ))
 		old_wpoints=$(grep "currentwp=" "$FWFACTIONFILEPFX$fid.txt")
 		old_wpoints=${old_wpoints//*=}
@@ -118,7 +118,16 @@ else
 			old_wpoints=${old_wpoints//*=}
 			old_wpoints=${old_wpoints// }
 			new_wpoints=$(($old_wpoints + $wptoadd))
+			sumowned=$(grep -c "_Faction_.*$fid" "$FWCHECKPOINTSFILE")
+			fptoadd=$(($sumowned * 100 ))
+			sumowned=$(grep -c "_Credit_.*$fid" "$FWCHECKPOINTSFILE")
+			crtoadd=$(($sumowned * 100000 ))
+			credits=$(grep "CreditsInBank=" "$FACTIONFILE/$fid")
+			credits=${credits/*=}
+			credits=$(($credits + $crtoadd))
 			as_user "sed -i 's/currentwp=$old_wpoints/currentwp=$new_wpoints/g' $FWFACTIONFILEPFX$fid.txt"
+			as_user "sed -i 's/CreditsInBank=.*/CreditsInBank=$credits/g' $FACTIONFILE/$fid"
+			as_user "screen -p 0 -S $SCREENID -X stuff $'/faction_point_add $fid $fptoadd\n'"
 			as_user "screen -p 0 -S $SCREENID -X stuff $'/server_message_broadcast info \"Faction $fid got $wptoadd WP and has now $new_wpoints WP total.\"\n'"
 		fi
 	done
@@ -242,7 +251,12 @@ then
 			BCFUNCTION=${SOURCE//CP_}
 			BCFUNCTION=${BCFUNCTION//_*}
 			case "$BCFUNCTION" in
+			  *"Faction"*)
+          ;&
+			  *"Credit"*)
+          ;&
 				*"WP"*)
+				  echo "Checkpoint says: \"I am $SOURCE!\""
 					old_belonger=$(grep "$SOURCE=" "$FWCHECKPOINTSFILE")
 					old_belonger=${old_belonger//*=}
 					old_belonger=${old_belonger// }
