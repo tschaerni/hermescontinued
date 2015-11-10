@@ -1021,42 +1021,50 @@ then
 	NOKEY=YES
 #	echo "No server key set for voting rewards"
 else
+	CMPVOTES=""
 	KEYURL="http://starmade-servers.com/api/?object=servers&element=voters&key=$SERVERKEY&month=current&format=xml"
 	while [ -e /proc/$SM_LOG_PID ]
 	do
 		if [ "$(ls -A $PLAYERFILE)" ]
 		then
 			ALLVOTES=$(wget -q -O - $KEYURL)
-			for PLAYER in $PLAYERFILE/*
-			do
-				PLAYER=${PLAYER//*\/}
-				TOTALVOTES=$(echo "$ALLVOTES" | grep -A1 "nickname>$PLAYER<")
-				if [ -n "$TOTALVOTES" ]
-				then
-					TOTALVOTES=${TOTALVOTES/*<votes>}
-					TOTALVOTES=${TOTALVOTES/<\/votes>*}
+			if [ "$ALLVOTES" != "$CMPVOTES" ]
+			then
+				for PLAYER in $PLAYERFILE/*
+				do
+					PLAYER=${PLAYER//*\/}
+					TOTALVOTES=$(echo "$ALLVOTES" | grep -A1 "nickname>$PLAYER<")
 					if [ -n "$TOTALVOTES" ]
 					then
-						VOTINGPOINTS=$(grep "VotingPoints=" $PLAYERFILE/$PLAYER)
-						VOTINGPOINTS=${VOTINGPOINTS/VotingPoints=}
-						CURRENTVOTES=$(grep "CurrentVotes=" $PLAYERFILE/$PLAYER)
-						CURRENTVOTES=${CURRENTVOTES/CurrentVotes=}
-						if [ $TOTALVOTES -ge $CURRENTVOTES ]
+						TOTALVOTES=${TOTALVOTES/*<votes>}
+						TOTALVOTES=${TOTALVOTES/<\/votes>*}
+						if [ -n "$TOTALVOTES" ]
 						then
-							ADDVOTES=$(($TOTALVOTES-$CURRENTVOTES))
-						else
-							ADDVOTES=$TOTALVOTES
-						fi
-						VOTESSAVED=$(($VOTINGPOINTS+$ADDVOTES))
-						as_user "sed -i 's/VotingPoints=.*/VotingPoints=$VOTESSAVED/g' $PLAYERFILE/$PLAYER"
-						as_user "sed -i 's/CurrentVotes=.*/CurrentVotes=$TOTALVOTES/g' $PLAYERFILE/$PLAYER"
-						if [ $ADDVOTES -gt 0 ]
-						then
-							as_user "screen -p 0 -S $SCREENID -X stuff $'/chat $PLAYER just got $ADDVOTES point(s) for voting! You can get voting points too by going to starmade-servers.com!\n'"
+							VOTINGPOINTS=$(grep "VotingPoints=" $PLAYERFILE/$PLAYER)
+							VOTINGPOINTS=${VOTINGPOINTS/VotingPoints=}
+							CURRENTVOTES=$(grep "CurrentVotes=" $PLAYERFILE/$PLAYER)
+							CURRENTVOTES=${CURRENTVOTES/CurrentVotes=}
+							if [ $TOTALVOTES -ge $CURRENTVOTES ]
+							then
+								ADDVOTES=$(($TOTALVOTES-$CURRENTVOTES))
+							else
+								ADDVOTES=$TOTALVOTES
+							fi
+							VOTESSAVED=$(($VOTINGPOINTS+$ADDVOTES))
+							if [ "$TOTALVOTES" != "$CURRENTVOTES" ]
+							then
+								as_user "sed -i 's/CurrentVotes=.*/CurrentVotes=$TOTALVOTES/g' $PLAYERFILE/$PLAYER"
+							fi
+							if [ $ADDVOTES -gt 0 ]
+							then
+								as_user "sed -i 's/VotingPoints=.*/VotingPoints=$VOTESSAVED/g' $PLAYERFILE/$PLAYER"
+								as_user "screen -p 0 -S $SCREENID -X stuff $'/chat $PLAYER just got $ADDVOTES point(s) for voting! You can get voting points too by going to starmade-servers.com!\n'"
+							fi
 						fi
 					fi
-				fi
-			done
+				done
+			fi
+			CMPVOTES=$ALLVOTES
 		fi
 		sleep $VOTECHECKDELAY
 	done
