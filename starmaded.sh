@@ -1029,24 +1029,31 @@ else
 			ALLVOTES=$(wget -q -O - $KEYURL)
 			for PLAYER in $PLAYERFILE/*
 			do
-				PLAYER=$(echo $PLAYER | rev | cut -d"/" -f1 | rev )
-				TOTALVOTES=$(echo $ALLVOTES | tr " " "\n" | grep -A1 "nickname>$PLAYER<" | tr "\n" " " | cut -d">" -f4 | cut -d"<" -f1)
-				VOTINGPOINTS=$(grep "VotingPoints=" $PLAYERFILE/$PLAYER | cut -d= -f2 | tr -d " " )
-				CURRENTVOTES=$(grep "CurrentVotes=" $PLAYERFILE/$PLAYER | cut -d= -f2 | tr -d " " )
-				if [[ ! -z "$TOTALVOTES" ]]
+				PLAYER=${PLAYER//*\/}
+				TOTALVOTES=$(echo "$ALLVOTES" | grep -A1 "nickname>$PLAYER<")
+				if [ -n "$TOTALVOTES" ]
 				then
-					if [ $TOTALVOTES -ge $CURRENTVOTES ]
+					TOTALVOTES=${TOTALVOTES/*<votes>}
+					TOTALVOTES=${TOTALVOTES/<\/votes>*}
+					if [ -n "$TOTALVOTES" ]
 					then
-						ADDVOTES=$(($TOTALVOTES-$CURRENTVOTES))
-					else
-						ADDVOTES=$TOTALVOTES
-					fi
-					VOTESSAVED=$(($VOTINGPOINTS+$ADDVOTES))
-					as_user "sed -i 's/VotingPoints=.*/VotingPoints=$VOTESSAVED/g' $PLAYERFILE/$PLAYER"
-					as_user "sed -i 's/CurrentVotes=.*/CurrentVotes=$TOTALVOTES/g' $PLAYERFILE/$PLAYER"
-					if [ $ADDVOTES -gt 0 ]
-					then
-						as_user "screen -p 0 -S $SCREENID -X stuff $'/chat $PLAYER just got $ADDVOTES point(s) for voting! You can get voting points too by going to starmade-servers.com!\n'"
+						VOTINGPOINTS=$(grep "VotingPoints=" $PLAYERFILE/$PLAYER)
+						VOTINGPOINTS=${VOTINGPOINTS/VotingPoints=}
+						CURRENTVOTES=$(grep "CurrentVotes=" $PLAYERFILE/$PLAYER)
+						CURRENTVOTES=${CURRENTVOTES/CurrentVotes=}
+						if [ $TOTALVOTES -ge $CURRENTVOTES ]
+						then
+							ADDVOTES=$(($TOTALVOTES-$CURRENTVOTES))
+						else
+							ADDVOTES=$TOTALVOTES
+						fi
+						VOTESSAVED=$(($VOTINGPOINTS+$ADDVOTES))
+						as_user "sed -i 's/VotingPoints=.*/VotingPoints=$VOTESSAVED/g' $PLAYERFILE/$PLAYER"
+						as_user "sed -i 's/CurrentVotes=.*/CurrentVotes=$TOTALVOTES/g' $PLAYERFILE/$PLAYER"
+						if [ $ADDVOTES -gt 0 ]
+						then
+							as_user "screen -p 0 -S $SCREENID -X stuff $'/chat $PLAYER just got $ADDVOTES point(s) for voting! You can get voting points too by going to starmade-servers.com!\n'"
+						fi
 					fi
 				fi
 			done

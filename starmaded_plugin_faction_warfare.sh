@@ -325,10 +325,12 @@ then
 					echo "Beacon says: \"Give me vanta!\""
 					as_user "screen -p 0 -S $SCREENID -X stuff $'/give $PLAYER \"Vanta\" 10\n'"
 					as_user "screen -p 0 -S $SCREENID -X stuff $'/pm $PLAYER \"You just got 10 Vanta blocks!\"\n'"
+					;;
 				*"Credit"*)
 					echo "Beacon says: \"Give me credits!\""
 					as_user "screen -p 0 -S $SCREENID -X stuff $'/give_credits $PLAYER 50000\n'"
 					as_user "screen -p 0 -S $SCREENID -X stuff $'/pm $PLAYER \"You just got 10 Vanta blocks!\"\n'"
+					;;
 				*"Random"*)
 					echo "Beacon says: \"Do a random thing!\""
 					;;
