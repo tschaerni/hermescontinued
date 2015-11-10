@@ -161,7 +161,7 @@ then
 		pl_bounty_calc_take_bounty
 		pl_bounty_credit_drops
 		BOUNTY=$(($PLAYERBOUNTY + $FACTIONBOUNTY))
-		if [ $BOUNTY -le 0 ]
+		if [ $BOUNTY -le 0 ] && [ $DROPEDCREDITS -le 0 ]
 		then
 			as_user "screen -p 0 -S $SCREENID -X stuff $'/pm $KILLERNAME No bounty was set on ${KILLEDPLAYER}\s head!\n'"
 			return
@@ -199,11 +199,11 @@ pl_bounty_credit_drops() {
 DROPEDCREDITS=0
 if [ $CREDITDROPPERCENTAGE -gt 0 ]
 then
-	log_playerinfo
+	log_playerinfo $KILLEDPLAYER
 	CURCREDITS=$(grep "CurrentCredits=" "$PLAYERFILE/$KILLEDPLAYER")
 	CURCREDITS=${CURCREDITS//*=}
 	CURCREDITS=${CURCREDITS// }
-	DROPEDCREDITS=$(($CURCREDITS * 100 / $CREDITDROPPERCENTAGE))
+	DROPEDCREDITS=$(($CURCREDITS * $CREDITDROPPERCENTAGE / 100))
 	CURCREDITS=$(($CURCREDITS - $DROPEDCREDITS))
 	as_user "screen -p 0 -S $SCREENID -X stuff $'/give_credits $KILLEDPLAYER -$DROPEDCREDITS\n'"
 	as_user "sed -i 's/CurrentCredits=.*/CurrentCredits=$CURCREDITS/g' '$PLAYERFILE/$KILLEDPLAYER'"

@@ -1403,10 +1403,10 @@ do
 		then
 			echo "Faction $FID named $FNAME has less then -300 FPs, set them back to -300"
 			as_user "screen -p 0 -S $SCREENID -X stuff $'/faction_point_set $FID -300\n'"
-		else if [ $FPOINTS -gt 100000 ]
+		else if [ $FPOINTS -gt 10000 ]
 		then
-			echo "Faction $FID named $FNAME has more then 100000 FPs, set them back to 100000"
-			as_user "screen -p 0 -S $SCREENID -X stuff $'/faction_point_set $FID 100000\n'"
+			echo "Faction $FID named $FNAME has more then 10000 FPs, set them back to 10000"
+			as_user "screen -p 0 -S $SCREENID -X stuff $'/faction_point_set $FID 10000\n'"
 		fi
 		fi
 		fi

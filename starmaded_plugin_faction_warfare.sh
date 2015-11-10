@@ -163,9 +163,9 @@ DEFAULTPIRATEBP=Pirate
 SPAWNBEACONLISTFILE=$FACTIONWARFAREFILES/beaconspawns.txt
 SPAWNPOSSIBLEFUNCTIONS=( None )
 SPAWNTIMER=1800
-WPEXCHANGERATEFP=100
-WPEXCHANGERATESILVER=10
-WPEXCHANGERATECREDITS=10000
+WPEXCHANGERATEFP=50
+WPEXCHANGERATESILVER=2
+WPEXCHANGERATECREDITS=0
 _EOF_"
 as_user "$CONFIGCREATE"
 }
@@ -252,9 +252,9 @@ then
 			BCFUNCTION=${BCFUNCTION//_*}
 			case "$BCFUNCTION" in
 			  *"Faction"*)
-          ;&
+			  ;&
 			  *"Credit"*)
-          ;&
+			  ;&
 				*"WP"*)
 				  echo "Checkpoint says: \"I am $SOURCE!\""
 					old_belonger=$(grep "$SOURCE=" "$FWCHECKPOINTSFILE")
@@ -343,7 +343,7 @@ then
 				*"Credit"*)
 					echo "Beacon says: \"Give me credits!\""
 					as_user "screen -p 0 -S $SCREENID -X stuff $'/give_credits $PLAYER 50000\n'"
-					as_user "screen -p 0 -S $SCREENID -X stuff $'/pm $PLAYER \"You just got 10 Vanta blocks!\"\n'"
+					as_user "screen -p 0 -S $SCREENID -X stuff $'/pm $PLAYER \"You just got 50.000 Credits!\"\n'"
 					;;
 				*"Random"*)
 					echo "Beacon says: \"Do a random thing!\""
