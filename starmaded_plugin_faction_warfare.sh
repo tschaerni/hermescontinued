@@ -542,9 +542,11 @@ function COMMAND_FW_EXCHANGE(){
 	then
 		as_user "screen -p 0 -S $SCREENID -X stuff $'/pm $1 Invalid parameters. Please use !FW_WPEXCHANGE fp/silver/credits nr. Exchange factor 1wp = ${WPEXCHANGERATEFP}FP or 1wp=${WPEXCHANGERATESILVER} silver or 1wp=${WPEXCHANGERATECREDITS} Credits\n'"
 	else
-		fid=${WARFACTIONIDS[0]}
+		FACTIONID=$(grep "PlayerFaction=" "$PLAYERFILE/$1")
+		FACTIONID=${FACTIONID/*=}
+		FACTIONID=${FACTIONID// }
 		wptosub=$3
-		old_wpoints=$(grep "currentwp=" "$FWFACTIONFILEPFX$fid.txt")
+		old_wpoints=$(grep "currentwp=" "$FWFACTIONFILEPFX$FACTIONID.txt")
 		old_wpoints=${old_wpoints//*=}
 		old_wpoints=${old_wpoints// }
 		new_wpoints=$(($old_wpoints - $wptosub))
@@ -552,17 +554,17 @@ function COMMAND_FW_EXCHANGE(){
 		then
 			if [ $2 = "fp" ] && [ $WPEXCHANGERATEFP -gt 0 ]
 			then
-				as_user "sed -i 's/currentwp=$old_wpoints/currentwp=$new_wpoints/g' $FWFACTIONFILEPFX$fid.txt"
-				as_user "screen -p 0 -S $SCREENID -X stuff $'/faction_point_add $fid $(($WPEXCHANGERATEFP * $3))\n'"
+				as_user "sed -i 's/currentwp=$old_wpoints/currentwp=$new_wpoints/g' $FWFACTIONFILEPFX$FACTIONID.txt"
+				as_user "screen -p 0 -S $SCREENID -X stuff $'/faction_point_add $FACTIONID $(($WPEXCHANGERATEFP * $3))\n'"
 				as_user "screen -p 0 -S $SCREENID -X stuff $'/pm $1 Exchanged $wptosub WP into $(($WPEXCHANGERATEFP * $3)) FP\n'"
 			else if [ $2 = "silver" ] && [ $WPEXCHANGERATESILVER -gt 0 ]
 			then
-				as_user "sed -i 's/currentwp=$old_wpoints/currentwp=$new_wpoints/g' $FWFACTIONFILEPFX$fid.txt"
+				as_user "sed -i 's/currentwp=$old_wpoints/currentwp=$new_wpoints/g' $FWFACTIONFILEPFX$FACTIONID.txt"
 				as_user "screen -p 0 -S $SCREENID -X stuff $'/give $1 silver $(($WPEXCHANGERATESILVER * $3))\n'"
 				as_user "screen -p 0 -S $SCREENID -X stuff $'/pm $1 Exchanged $wptosub WP into $(($WPEXCHANGERATESILVER * $3)) silver\n'"
 			else if [ $2 = "credits" ] && [ $WPEXCHANGERATECREDITS -gt 0 ]
 			then
-				as_user "sed -i 's/currentwp=$old_wpoints/currentwp=$new_wpoints/g' $FWFACTIONFILEPFX$fid.txt"
+				as_user "sed -i 's/currentwp=$old_wpoints/currentwp=$new_wpoints/g' $FWFACTIONFILEPFX$FACTIONID.txt"
 				as_user "screen -p 0 -S $SCREENID -X stuff $'/give_credits $1 $(($WPEXCHANGERATECREDITS * $3))\n'"
 				as_user "screen -p 0 -S $SCREENID -X stuff $'/pm $1 Exchanged $wptosub WP into $(($WPEXCHANGERATECREDITS * $3)) ccredits\n'"
 			else

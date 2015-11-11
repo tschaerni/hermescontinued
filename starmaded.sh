@@ -1277,11 +1277,15 @@ then
 	if [ -e "${PLAYERFILE}_old/$1" ]
 	then
 		VOTEBALANCE=$(grep "VotingPoints=" "${PLAYERFILE}_old/$1")
+		VOTEBALANCE=${VOTEBALANCE/*=}
+		VOTES=$(grep "CurrentVotes=" "${PLAYERFILE}_old/$1")
+		VOTES=${VOTES/*=}
 		if [ $VOTEBALANCE -gt 30 ]
 		then
 			  VOTEBALANCE=30
 		fi
 		as_user "sed -i 's/VotingPoints=.*/VotingPoints=$VOTEBALANCE/g' '$PLAYERFILE/$1'"
+		as_user "sed -i 's/CurrentVotes=.*/CurrentVotes=$VOTES/g' '$PLAYERFILE/$1'"
 	fi
 	#add to creditstatistic
 	NEWPLAYERGAIN=$(grep "ActualCreditGain_NewPlayers=" "$CREDITSTATUSFILE")
@@ -2358,7 +2362,7 @@ case "$1" in
 	;;
 	*)
 		echo "Doomsider's and Titanmasher's Starmade Daemon (DSD) V.17"
-		echo "Usage: starmaded.sh {help|start|stop|ebrake|restore|status|restart|upgrade|upgradestar|cronstop|cronbackup|cronrestore|bankfee|backup|backupstar|detect|log|screenlog|dump|box}"
+		echo "Usage: starmaded.sh {help|start|stop|ebrake|restore|status|restart|upgrade|upgradestar|cronstop|cronbackup|cronrestore|bankfee|backup|backupstar|detect|log|screenlog|dump|box|collectdata}"
 		#******************************************************************************
 		exit 1
 	;;
