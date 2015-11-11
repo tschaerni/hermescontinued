@@ -53,6 +53,7 @@ if [ ! -e "$BOUNTYFILEFACTION" ]
 then
 	as_user "echo \"#This file containes bounty on factions\" > $BOUNTYFILEFACTION"
 fi
+pl_bounty_list_all
 }
 
 
@@ -76,7 +77,6 @@ as_user "$CONFIGCREATE"
 }
 
 pl_bounty_kill() {
-echo "Found kill!"
 #remove * and ;
 TMPSTR=${1//'*'}
 TMPSTR=${TMPSTR//;}
@@ -148,6 +148,17 @@ case "$SOURCETYP" in
 		echo "$KILLEDPLAYER of faction $KILLEDFACTION got killed by a $SOURCETYP named $KILLERNAME"
 		;;
 esac
+KILLS=$(grep "PlayerDeaths=" "$PLAYERFILE/$KILLEDPLAYER")
+KILLS=${KILLS/*=}
+((KILLS++))
+as_user "sed -i 's/PlayerDeaths=.*/PlayerDeaths=$KILLS/g' '$PLAYERFILE/$KILLEDPLAYER'"
+if [ $KILLEDFACTION != "None" ]
+then
+	KILLS=$(grep "FactionDeaths=" "$FACTIONFILE/$KILLEDFACTION")
+	KILLS=${KILLS/*=}
+	((KILLS++))
+	as_user "sed -i 's/FactionDeaths=.*/FactionDeaths=$KILLS/g' '$FACTIONFILE/$KILLEDFACTION'"
+fi
 }
 
 pl_bounty_kill_direct() {
@@ -171,6 +182,12 @@ then
 		NEW=$(($BANKBALANCE + $BOUNTY + $DROPEDCREDITS))
 		as_user "sed -i 's/CreditsInBank=.*/CreditsInBank=$NEW/g' '$PLAYERFILE/$KILLERNAME'"
 		as_user "screen -p 0 -S $SCREENID -X stuff $'/pm $KILLERNAME You got $BOUNTY Credits from bounty and $DROPEDCREDITS Credits from creditdrop transfered onto your bankaccount for killing ${KILLEDPLAYER}!\n'"
+		pl_bounty_list_all
+
+		KILLS=$(grep "PlayerKills=" "$PLAYERFILE/$KILLERNAME")
+		KILLS=${KILLS/*=}
+		((KILLS++))
+		as_user "sed -i 's/PlayerKills=.*/PlayerKills=$KILLS/g' '$PLAYERFILE/$KILLERNAME'"
 	fi
 fi
 }
@@ -191,6 +208,12 @@ then
 		BANKBALANCE=${BANKBALANCE/*=}
 		NEW=$(($BANKBALANCE + $BOUNTY + $DROPEDCREDITS))
 		as_user "sed -i 's/CreditsInBank=.*/CreditsInBank=$NEW/g' '$FACTIONFILE/$KILLERFACTION'"
+		pl_bounty_list_all
+
+		KILLS=$(grep "FactionKills=" "$FACTIONFILE/$KILLERFACTION")
+		KILLS=${KILLS/*=}
+		((KILLS++))
+		as_user "sed -i 's/FactionKills=.*/FactionKills=$KILLS/g' '$FACTIONFILE/$KILLERFACTION'"
 	fi
 fi
 }
@@ -272,6 +295,7 @@ while [ $i -lt ${#BOUNTYSTRING[@]} ]; do
 	((i++))
 done
 rm "${BOUNTYFILEFACTION}_tmp" 2>/dev/null
+pl_bounty_list_all
 }
 
 pl_bounty_calc_take_bounty() {
@@ -384,11 +408,13 @@ for line in ${LINES[@]}; do
 	fi
 done
 IFS=$OLD_IFS
-rm /dev/shm/totalbounty.txt 2> /dev/null
+
+as_user "echo '<root>' > /dev/shm/totalbounty.xml"
 for PLAYER in ${PLAYERS[@]}; do
 	pl_bounty_calc_bounty
-	as_user "echo 'Totalbounty=$(($PLAYERBOUNTY + $FACTIONBOUNTY)) Player=$PLAYER Playerbounty=$PLAYERBOUNTY Factionbounty=$FACTIONBOUNTY' >> /dev/shm/totalbounty.txt"
+	as_user "echo '	<entry Player=\"$PLAYER\" Totalbounty=$(($PLAYERBOUNTY + $FACTIONBOUNTY)) Playerbounty=$PLAYERBOUNTY Factionbounty=$FACTIONBOUNTY />' >> /dev/shm/totalbounty.xml"
 done
+as_user "echo '</root>' >> /dev/shm/totalbounty.xml"
 }
 
 #Chat commands:
@@ -425,6 +451,7 @@ then
 	as_user "sed -i 's/CreditsInBank=.*/CreditsInBank=$NEW/g' '$PLAYERFILE/$1'"
 	as_user "echo \"PlayerWanted=$2 PlayerPrincipal=$1 Reward=$3 Balance=$4 DeadlineTurnsLeft=$5\" >> $BOUNTYFILEPLAYER"
 	as_user "screen -p 0 -S $SCREENID -X stuff $'/pm $1 Successfully set $3 bounty on $2\'s head for $5 turns. $4 credits were transfered to the bountyaccount.\n'"
+	pl_bounty_list_all
 else
 	as_user "screen -p 0 -S $SCREENID -X stuff $'/pm $1 Insufficient funds on bankaccount!\n'"
 fi
@@ -471,6 +498,7 @@ then
 	as_user "sed -i 's/CreditsInBank=.*/CreditsInBank=$NEW/g' '$FACTIONFILE/$FACTIONID'"
 	as_user "echo \"FactionWanted=$2 FactionPrincipal=$FACTIONID Reward=$3 Balance=$4 DeadlineTurnsLeft=$5\" >> $BOUNTYFILEFACTION"
 	as_user "screen -p 0 -S $SCREENID -X stuff $'/pm $1 Successfully set $3 bounty on faction $2\'s head for $5 turns. $4 credits were transfered from faction bankaccount to the bountyaccount.\n'"
+	pl_bounty_list_all
 else
 	as_user "screen -p 0 -S $SCREENID -X stuff $'/pm $1 Insufficient funds on faction bankaccount!\n'"
 fi

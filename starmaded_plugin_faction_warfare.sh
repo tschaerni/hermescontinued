@@ -113,7 +113,7 @@ else
 		FNAME=$(grep "FactionName=" "$FACTIONFILE/$fid")
 		FNAME=${FNAME/FactionName=}
 
-		sumowned=$(grep -c "$fid" "$FWCHECKPOINTSFILE")
+		sumowned=$(grep -c "_WP_.*$fid" "$FWCHECKPOINTSFILE")
 		wptoadd=$(($sumowned * $FWWARPOINTSPERCPROUND ))
 		if [ $wptoadd -gt 0 ]
 		then
@@ -680,7 +680,7 @@ then
 	return
 fi
 WPS=$(($WPS - $SCANCOSTGLOBAL))
-as_user "sed -i 's/currentwp=.*/currentwp=$WPS/g' '$FWFACTIONFILEPFX$fid.txt'"
+as_user "sed -i 's/currentwp=.*/currentwp=$WPS/g' '$FWFACTIONFILEPFX$FACTIONID.txt'"
 
 ONLINEPLAYERS=($(cat $ONLINELOG))
 SCANRESULT=""
@@ -696,6 +696,7 @@ function COMMAND_SCANFACTION(){
 if [ "$#" -ne "2" ]
 then
 	as_user "screen -p 0 -S $SCREENID -X stuff $'/pm $1 Invalid parameters. Please use !SCANFACTION <faction id>\n'"
+	return
 fi
 
 if [ ! -e "$FACTIONFILE/$2" ]
@@ -730,9 +731,9 @@ then
 	return
 fi
 WPS=$(($WPS - $SCANCOSTGLOBAL))
-as_user "sed -i 's/currentwp=.*/currentwp=$WPS/g' '$FWFACTIONFILEPFX$fid.txt'"
+as_user "sed -i 's/currentwp=.*/currentwp=$WPS/g' '$FWFACTIONFILEPFX$FACTIONID.txt'"
 
-collect_players_of_faction $2
+list_players_of_faction $2
 SCANRESULT=""
 for player in ${PLAYERS[@]}; do
 	POSITION=$(grep "PlayerLocation=" "$PLAYERFILE/$player")
@@ -746,6 +747,7 @@ function COMMAND_SCANPLAYER(){
 if [ "$#" -ne "2" ]
 then
 	as_user "screen -p 0 -S $SCREENID -X stuff $'/pm $1 Invalid parameters. Please use !SCANPLAYER <name>\n'"
+	return
 fi
 
 if [ ! -e "$PLAYERFILE/$2" ]
@@ -779,15 +781,14 @@ then
 	as_user "screen -p 0 -S $SCREENID -X stuff $'/pm $1 Your faction has not enough Credits in bank, a playerscan costs 400000!\n'"
 	return
 fi
-WPS=$(($WPS - $SCANCOSTGLOBAL))
-as_user "sed -i 's/currentwp=.*/currentwp=$WPS/g' '$FWFACTIONFILEPFX$fid.txt'"
+BALANCE=$(($BALANCE - 400000))
+as_user "sed -i 's/CreditsInBank=.*/CreditsInBank=$BALANCE/g' '$FACTIONFILE/$FACTIONID'"
 
-list_players_of_faction $2
-SCANRESULT=""
-for player in ${PLAYERS[@]}; do
-	POSITION=$(grep "PlayerLocation=" "$PLAYERFILE/$player")
-	POSITION=${POSITION/*=}
-	SCANRESULT="$SCANRESULT $player=($POSITION)"
-done
-as_user "screen -p 0 -S $SCREENID -X stuff $'/pm $1 Receiving scan data for faction $2: $SCANRESULT\n'"
+POSITION=$(grep "PlayerLocation=" "$PLAYERFILE/$2")
+POSITION=${POSITION/*=}
+as_user "screen -p 0 -S $SCREENID -X stuff $'/pm $1 Receiving scan data for player $2: ($POSITION)\n'"
+
+CREDITLOSS=$(grep "ActualCreditLoss_Other=" "$CREDITSTATUSFILE")
+CREDITLOSS=$(($CREDITLOSS + 400000))
+as_user "sed -i 's/ActualCreditLoss_Other=.*/ActualCreditLoss_Other=$CREDITLOSS/g' '$CREDITSTATUSFILE'"
 }

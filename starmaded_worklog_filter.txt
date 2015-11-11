@@ -10,3 +10,5 @@ GRAVITY UPDATE:::::: GRAV\[ENTITY_PLANET
 \[SERVER\]\[ACTIVATION\] sent 'true'
 starting gravity change DONE: source:
 Announcing kill:
+HANDLING Entity REQUEST: PE
+\[BLUEPRINT\] UID: ENTITY_SPACESTATION

@@ -486,6 +486,8 @@ create_creditstatusfile
 		SEARCHFACTIONTURN="[FACTIONMANAGER] faction update took:"
 		SEARCHCHANGE="has players attached. Doing Sector Change for PlS"
 		SEARCHPLANETGRAVITY="GRAVITY UPDATE:::::: GRAV[ENTITY_PLANET"
+		SEARCHSTATIONSPAWN="HANDLING Entity REQUEST: PE"
+		SEARCHSTATIONBLUEPRINT="[BLUEPRINT] UID: ENTITY_SPACESTATION"
 # Linenumber is set to zero and the a while loop runs through every present array in Linestring
 		LINENUMBER=0
 		while [ -n "${LINESTRING[$LINENUMBER]+set}" ]
@@ -528,6 +530,11 @@ create_creditstatusfile
 				;;
 			*"$SEARCHPLANETGRAVITY"*)
 				log_planetgravity $CURRENTSTRING &
+				;;
+			*"$SEARCHSTATIONSPAWN"*)
+				;&
+			*"$SEARCHSTATIONBLUEPRINT"*)
+				los_stationspawn $CURRENTSTRING &
 				;;
 			*"$SEARCHFACTIONTURN"*)
 				check_factions &
@@ -943,17 +950,24 @@ as_user "sed -i 's/PlayerLocation=.*/PlayerLocation=$SECTOR/g' $PLAYERFILE/$PLAY
 
 log_planetgravity() {
 TMP="$@"
-SOURCE=${TMP/[*}
+SOURCE=${TMP//\[*}
 #SOURCE could be Ship or PlayerCharacter
 if [ "$SOURCE" == "Ship" ]
 then
-	SHIP=${TMP//]*}
-	SHIP=${SHIP/Ship[}
-	PLANET=${TMP/*GRAV[}
-	PLANET=${PLANET/(*}
+	SHIP=${TMP//\]*}
+	SHIP=${SHIP/Ship\[}
+	PLANET=${TMP/*GRAV\[}
+	PLANET=${PLANET//(*}
 	TIMESTAMP=$(date '+%b_%d_%Y_%H.%M.%S')
 	as_user "echo '$TIMESTAMP Ship $SHIP entered gravity of planet $PLANET' >> '$PLANETGRAVLOG'"
 fi
+}
+
+los_stationspawn() {
+CREDITLOSS=$(grep "ActualCreditLoss_Station=" "$CREDITSTATUSFILE")
+CREDITLOSS=$(($CREDITLOSS + 1000000))
+as_user "sed -i 's/ActualCreditLoss_Station=.*/ActualCreditLoss_Station=$CREDITLOSS/g' '$CREDITSTATUSFILE'"
+echo "Detected Stationspawn"
 }
 
 #------------------------------Game mechanics-----------------------------------------
@@ -1085,6 +1099,7 @@ CreditsInBank=0
 FactionLastUpdate=$FLASTUPDATE
 FactionPoints=0
 FactionKills=0
+FactionDeaths=0
 _EOF_"
 as_user "$CREATEFACTION"
 }
@@ -1263,7 +1278,7 @@ then
 	then
 		VOTEBALANCE=$(grep "VotingPoints=" "${PLAYERFILE}_old/$1")
 		if [ $VOTEBALANCE -gt 30 ]
-		the
+		then
 			  VOTEBALANCE=30
 		fi
 		as_user "sed -i 's/VotingPoints=.*/VotingPoints=$VOTEBALANCE/g' '$PLAYERFILE/$1'"
@@ -1547,6 +1562,44 @@ for line in ${PLAYERS[@]}; do
 done
 PLAYERS=($TMP)
 }
+
+collect_player_infos() {
+as_user "echo '<root>' > /dev/shm/playerlist.xml"
+for PLAYER in $PLAYERFILE/* ; do
+	PLAYER=${PLAYER//*\/}
+	FACTION=$(grep PlayerFaction= "$PLAYERFILE/$PLAYER")
+	FACTION=${FACTION/*=}
+	KILLS=$(grep PlayerKills= "$PLAYERFILE/$PLAYER")
+	KILLS=${KILLS/*=}
+	DEATHS=$(grep PlayerDeaths= "$PLAYERFILE/$PLAYER")
+	DEATHS=${DEATHS/*=}
+	BALANCE=$(grep CreditsInBank= "$PLAYERFILE/$PLAYER")
+	BALANCE=${BALANCE/*=}
+	as_user "echo '	<entry Player=\"$PLAYER\" Faction=$FACTION Kills=$KILLS Deaths=$DEATHS Bankbalance=$BALANCE />' >> /dev/shm/playerlist.xml"
+done
+as_user "echo '</root>' >> /dev/shm/playerlist.xml"
+}
+
+collect_faction_infos() {
+as_user "echo '<root>' > /dev/shm/factionlist.xml"
+for FACTION in $FACTIONFILE/* ; do
+	FACTION=${FACTION//*\/}
+	FACTIONNAME=$(grep FactionName= "$FACTIONFILE/$FACTION")
+	FACTIONNAME=${FACTIONNAME/FactionName=}
+	FPS=$(grep FactionPoints= "$FACTIONFILE/$FACTION")
+	FPS=${FPS/*=}
+	KILLS=$(grep FactionKills= "$FACTIONFILE/$FACTION")
+	KILLS=${KILLS/*=}
+	DEATHS=$(grep FactionDeaths= "$FACTIONFILE/$FACTION")
+	DEATHS=${DEATHS/*=}
+	BALANCE=$(grep CreditsInBank= "$FACTIONFILE/$FACTION")
+	BALANCE=${BALANCE/*=}
+	list_players_of_faction $FACTION
+	as_user "echo '	<entry Faction=$FACTION Name=\"$FACTIONNAME\" Factionpoints=$FPS Members=${#PLAYERS[@]} Kills=$KILLS Deaths=$DEATHS Bankbalance=$BALANCE />' >> /dev/shm/factionlist.xml"
+done
+as_user "echo '</root>' >> /dev/shm/factionlist.xml"
+}
+
 #---------------------------Chat Commands---------------------------------------------
 
 #Example Command
@@ -1612,6 +1665,10 @@ function COMMAND_DEPOSIT(){
 					as_user "screen -p 0 -S $SCREENID -X stuff $'/pm $1 GALATIC BANK You successfully deposited $2 credits with a tax of $BANKTAX\n'"
 					as_user "screen -p 0 -S $SCREENID -X stuff $'/pm $1 GALATIC BANK Your balance is now $NEWBALANCE\n'"
 					as_user "echo '$1 deposited $2' >> $BANKLOG"
+					CREDITLOSS=$(grep ActualCreditLoss_BankDepositFee= $CREDITSTATUSFILE)
+					CREDITLOSS=${CREDITLOSS//*=}
+					CREDITLOSS=$(($CREDITLOSS + $BANKTAX))
+					as_user "sed -i 's/ActualCreditLoss_BankDepositFee=.*/ActualCreditLoss_BankDepositFee=$CREDITLOSS/g' $CREDITSTATUSFILE"
 				else
 					as_user "screen -p 0 -S $SCREENID -X stuff $'/pm $1 GALATIC BANK Insufficient money\n'"
 #					echo "not enough money"
@@ -1818,10 +1875,12 @@ function COMMAND_FBALANCE(){
 		as_user "screen -p 0 -S $SCREENID -X stuff $'/pm $1 GALACTIC BANK - Connecting to servers\n'"
 #We don't need log_playerinfo anymore here. We get the factionchanges directly.
 		create_playerfile $1
-		FACTION=$(grep "PlayerFaction" $PLAYERFILE/$1 | cut -d= -f2)
+		FACTION=$(grep "PlayerFaction=" $PLAYERFILE/$1)
+		FACTION=${FACTION/*=}
 		if [ ! $FACTION = "None" ]
 		then
-			BALANCECREDITS=$(grep CreditsInBank $FACTIONFILE/$FACTION | cut -d= -f2 | tr -d ' ')
+			BALANCECREDITS=$(grep CreditsInBank= $FACTIONFILE/$FACTION)
+			BALANCECREDITS=${BALANCECREDITS/*=}
 			as_user "screen -p 0 -S $SCREENID -X stuff $'/pm $1 GALACTIC BANK - Your faction has $BALANCECREDITS credits\n'"
 		else
 			as_user "screen -p 0 -S $SCREENID -X stuff $'/pm $1 GALACTIC BANK - You are not in a faction\n'"
@@ -2286,6 +2345,12 @@ case "$1" in
 		sm_load_plugins
 		check_credits
 		check_factions
+	;;
+	collectdata)
+		sm_load_plugins
+		pl_bounty_list_all
+		collect_player_infos
+		collect_faction_infos
 	;;
 	debug)
 		echo ${@:2}
