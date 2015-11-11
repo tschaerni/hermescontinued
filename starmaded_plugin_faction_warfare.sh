@@ -74,7 +74,7 @@ then
 fi
 
 for checkpoint_name in ${CHECKPOINTS[@]} ; do
-	if [ "$(grep "$checkpoint_name" "$FWCHECKPOINTSFILE")" == "" ] && [[ "$checkpoint_name" =~ "_WP_" ]]
+	if [ "$(grep "$checkpoint_name" "$FWCHECKPOINTSFILE")" == "" ]
 	then
 		echo "$checkpoint_name=0" >> "$FWCHECKPOINTSFILE"
 	fi
@@ -110,6 +110,9 @@ else
 	for ffile in ${FACTIONS[@]}; do
 		fid=${ffile//*faction}
 		fid=${fid/.txt}
+		FNAME=$(grep "FactionName=" "$FACTIONFILE/$fid")
+		FNAME=${FNAME/FactionName=}
+
 		sumowned=$(grep -c "$fid" "$FWCHECKPOINTSFILE")
 		wptoadd=$(($sumowned * $FWWARPOINTSPERCPROUND ))
 		if [ $wptoadd -gt 0 ]
@@ -118,17 +121,30 @@ else
 			old_wpoints=${old_wpoints//*=}
 			old_wpoints=${old_wpoints// }
 			new_wpoints=$(($old_wpoints + $wptoadd))
-			sumowned=$(grep -c "_Faction_.*$fid" "$FWCHECKPOINTSFILE")
-			fptoadd=$(($sumowned * 100 ))
-			sumowned=$(grep -c "_Credit_.*$fid" "$FWCHECKPOINTSFILE")
-			crtoadd=$(($sumowned * 100000 ))
+			as_user "sed -i 's/currentwp=$old_wpoints/currentwp=$new_wpoints/g' $FWFACTIONFILEPFX$fid.txt"
+			as_user "screen -p 0 -S $SCREENID -X stuff $'/server_message_broadcast info \"Faction $FNAME (ID:$fid) got $wptoadd WP and has now $new_wpoints WP total.\"\n'"
+		fi
+
+		sumowned=$(grep -c "_Faction_.*$fid" "$FWCHECKPOINTSFILE")
+		fptoadd=$(($sumowned * $CHECKPOINTFACTIONPOINTS ))
+		if [ $fptoadd -gt 0 ]
+		then
+			as_user "screen -p 0 -S $SCREENID -X stuff $'/faction_point_add $fid $fptoadd\n'"
+			as_user "screen -p 0 -S $SCREENID -X stuff $'/server_message_broadcast info \"Faction $FNAME (ID:$fid) got $fptoadd FP from checkpoints.\"\n'"
+		fi
+
+		sumowned=$(grep -c "_Credit_.*$fid" "$FWCHECKPOINTSFILE")
+		crtoadd=$(($sumowned * $CHECKPOINTCREDITS ))
+		if [ $crtoadd -gt 0 ]
+		then
 			credits=$(grep "CreditsInBank=" "$FACTIONFILE/$fid")
 			credits=${credits/*=}
 			credits=$(($credits + $crtoadd))
-			as_user "sed -i 's/currentwp=$old_wpoints/currentwp=$new_wpoints/g' $FWFACTIONFILEPFX$fid.txt"
 			as_user "sed -i 's/CreditsInBank=.*/CreditsInBank=$credits/g' $FACTIONFILE/$fid"
-			as_user "screen -p 0 -S $SCREENID -X stuff $'/faction_point_add $fid $fptoadd\n'"
-			as_user "screen -p 0 -S $SCREENID -X stuff $'/server_message_broadcast info \"Faction $fid got $wptoadd WP and has now $new_wpoints WP total.\"\n'"
+			CHECKPOINTGAIN=$(grep "ActualCreditGain_Checkpoints=" "$CREDITSTATUSFILE")
+			CHECKPOINTGAIN=$(($CHECKPOINTGAIN + $crtoadd))
+			as_user "sed -i 's/ActualCreditGain_Checkpoints=.*/ActualCreditGain_Checkpoints=$CHECKPOINTGAIN/g' '$CREDITSTATUSFILE'"
+			as_user "screen -p 0 -S $SCREENID -X stuff $'/server_message_broadcast info \"Faction $FNAME (ID:$fid) got $crtoadd Credits from checkpoints.\"\n'"
 		fi
 	done
 fi
@@ -166,6 +182,12 @@ SPAWNTIMER=1800
 WPEXCHANGERATEFP=50
 WPEXCHANGERATESILVER=2
 WPEXCHANGERATECREDITS=0
+BEACONCREDITS=50000
+BEACONSILVER=3
+BEACONFACTIONPOINTS=100
+CHECKPOINTCREDITS=100000
+CHECKPOINTFACTIONPOINTS=100
+SCANCOSTGLOBAL=2
 _EOF_"
 as_user "$CONFIGCREATE"
 }
@@ -251,12 +273,26 @@ then
 			BCFUNCTION=${SOURCE//CP_}
 			BCFUNCTION=${BCFUNCTION//_*}
 			case "$BCFUNCTION" in
-			  *"Faction"*)
-			  ;&
-			  *"Credit"*)
-			  ;&
+				*"Scanner"*)
+					if [ $SCANCOSTGLOBAL -eq 0 ]
+					then
+						echo "Checkpoint says: \"I am a Scanner!\""
+						ONLINEPLAYERS=($(cat $ONLINELOG))
+						SCANRESULT=""
+						for player in ${ONLINEPLAYERS[@]}; do
+							POSITION=$(grep "PlayerLocation=" "$PLAYERFILE/$player")
+							POSITION=${POSITION/*=}
+							SCANRESULT="$SCANRESULT $player=($POSITION)"
+						done
+						as_user "screen -p 0 -S $SCREENID -X stuff $'/pm $PLAYER Receiving scan data: $SCANRESULT\n'"
+					fi
+				;&
+				*"Faction"*)
+				;&
+				*"Credit"*)
+				;&
 				*"WP"*)
-				  echo "Checkpoint says: \"I am $SOURCE!\""
+					echo "Checkpoint says: \"I am $SOURCE!\""
 					old_belonger=$(grep "$SOURCE=" "$FWCHECKPOINTSFILE")
 					old_belonger=${old_belonger//*=}
 					old_belonger=${old_belonger// }
@@ -270,17 +306,6 @@ then
 						as_user "screen -p 0 -S $SCREENID -X stuff $'/server_message_broadcast info \"Checkpoint $SOURCE from $OLDFNAME (ID:$old_belonger) now belongs to Faction $FNAME (ID:$FACTIONID)\"\n'"
 					fi
 					;;
-				*"Scanner"*)
-					echo "Checkpoint says: \"I am a Scanner!\""
-					ONLINEPLAYERS=($(cat $ONLINELOG))
-					SCANRESULT=""
-					for player in ${ONLINEPLAYERS[@]}; do
-						POSITION=$(grep "PlayerLocation=" "$PLAYERFILE/$player")
-						POSITION=${POSITION/*=}
-						SCANRESULT="$SCANRESULT $player=($POSITION)"
-					done
-					as_user "screen -p 0 -S $SCREENID -X stuff $'/pm $PLAYER Receiving scan data: $SCANRESULT\n'"
-					;;
 				*)
 					;;
 			esac
@@ -289,7 +314,7 @@ then
 #It is a beacon with some spceial function
 			BCFUNCTION=${SOURCE//CB_}
 			BCFUNCTION=${BCFUNCTION//_*}
-			
+
 #delete beacon from list and delete entity. Do this before any other action to reduce the possibility of abuse. (F.e. use by two players simultaneously)
 			as_user "screen -p 0 -S $SCREENID -X stuff $'/destroy_uid ENTITY_SHIP_$SOURCE\n'"
 			OLD="$(grep "FUNCTIONALBEACONS=" "$FACTIONWARFARECONFIG")"
@@ -325,15 +350,15 @@ then
 					sleep 30
 					as_user "screen -p 0 -S $SCREENID -X stuff $'/spawn_entity $DEFAULTPIRATEBP MOB_${DEFAULTPIRATEBP}_$RANDOM $POSITION -1 true\n'"
 					;;
-				*"Gold"*)
-					echo "Beacon says: \"Give me gold!\""
-					as_user "screen -p 0 -S $SCREENID -X stuff $'/give $PLAYER \"Silver Bar\" 3\n'"
-					as_user "screen -p 0 -S $SCREENID -X stuff $'/pm $PLAYER \"You just got 3 silver bars!\"\n'"
+				*"Silver"*)
+					echo "Beacon says: \"Give me silver!\""
+					as_user "screen -p 0 -S $SCREENID -X stuff $'/give $PLAYER \"Silver Bar\" $BEACONSILVER\n'"
+					as_user "screen -p 0 -S $SCREENID -X stuff $'/pm $PLAYER \"You just got $BEACONSILVER silver bars!\"\n'"
 					;;
 				*"Faction"*)
 					echo "Beacon says: \"Give my faction FPs!\""
-					as_user "screen -p 0 -S $SCREENID -X stuff $'/pm $PLAYER \"Your faction got 100FP from a Factionbeacon!\"\n'"
-					as_user "screen -p 0 -S $SCREENID -X stuff $'/faction_point_add $FACTIONID 100\n'"
+					as_user "screen -p 0 -S $SCREENID -X stuff $'/pm $PLAYER \"Your faction got ${BEACONFACTIONPOINTS}FP from a Factionbeacon!\"\n'"
+					as_user "screen -p 0 -S $SCREENID -X stuff $'/faction_point_add $FACTIONID $BEACONFACTIONPOINTS\n'"
 					;;
 				*"Vanta"*)
 					echo "Beacon says: \"Give me vanta!\""
@@ -342,8 +367,11 @@ then
 					;;
 				*"Credit"*)
 					echo "Beacon says: \"Give me credits!\""
-					as_user "screen -p 0 -S $SCREENID -X stuff $'/give_credits $PLAYER 50000\n'"
-					as_user "screen -p 0 -S $SCREENID -X stuff $'/pm $PLAYER \"You just got 50.000 Credits!\"\n'"
+					as_user "screen -p 0 -S $SCREENID -X stuff $'/give_credits $PLAYER $BEACONCREDITS\n'"
+					as_user "screen -p 0 -S $SCREENID -X stuff $'/pm $PLAYER \"You just got $BEACONCREDITS Credits!\"\n'"
+					BEACONGAIN=$(grep "ActualCreditGain_Beacons=" "$CREDITSTATUSFILE")
+					BEACONGAIN=$(($BEACONGAIN + $BEACONCREDITS))
+					as_user "sed -i 's/ActualCreditGain_Beacons=.*/ActualCreditGain_Beacons=$BEACONGAIN/g' '$CREDITSTATUSFILE'"
 					;;
 				*"Random"*)
 					echo "Beacon says: \"Do a random thing!\""
@@ -375,7 +403,7 @@ CHECKPOINTS=${CHECKPOINTS/ )}
 }
 
 sm_get_rnd_beacon_fn(){
-#POSSIBLEFUNCTIONS=( Faction Faction Pirate Gold Gold Scanner Random Schnitzel None )
+#POSSIBLEFUNCTIONS=( Faction Faction Pirate Silver Silver Scanner Random Schnitzel None )
 if [ ${#SPAWNPOSSIBLEFUNCTIONS[@]} -ge 1 ]
 then
 	RNDFUNCTION=$(( $RANDOM % ${#SPAWNPOSSIBLEFUNCTIONS[@]} ))
@@ -508,8 +536,8 @@ function COMMAND_FW_POINTS(){
 }
 
 function COMMAND_FW_EXCHANGE(){
-#Exchanges WPs to factionpoints or gold
-#USAGE: !FW_EXCHANGE <fp/gold> <amount>
+#Exchanges WPs to factionpoints or silver
+#USAGE: !FW_EXCHANGE <fp/silver> <amount>
 	if [ "$#" -ne "3" ]
 	then
 		as_user "screen -p 0 -S $SCREENID -X stuff $'/pm $1 Invalid parameters. Please use !FW_WPEXCHANGE fp/silver/credits nr. Exchange factor 1wp = ${WPEXCHANGERATEFP}FP or 1wp=${WPEXCHANGERATESILVER} silver or 1wp=${WPEXCHANGERATECREDITS} Credits\n'"
@@ -623,4 +651,143 @@ else
 	as_user "sed -i 's/FUNCTIONALBEACONS=.*/FUNCTIONALBEACONS=( )/g' '$FACTIONWARFARECONFIG'"
 	as_user "screen -p 0 -S $SCREENID -X stuff $'/pm $1 Cleaned up the mess. The whole beaconlist got deleted and all matching entities got destroyed\n'"
 fi
+}
+
+function COMMAND_SCANGLOBAL(){
+FACTIONID=$(grep "PlayerFaction=" "$PLAYERFILE/$1")
+FACTIONID=${FACTIONID/*=}
+FACTIONID=${FACTIONID// }
+if [ "$FACTIONID" == "None" ]
+then
+	as_user "screen -p 0 -S $SCREENID -X stuff $'/pm $1 You are not in a faction!\n'"
+	return
+fi
+
+sumowned=$(grep -c "_Scanner_.*$FACTIONID" "$FWCHECKPOINTSFILE")
+if [ $sumowned -eq 0 ]
+then
+	as_user "screen -p 0 -S $SCREENID -X stuff $'/pm $1 Your faction does not own a scanner-checkpoint!\n'"
+	return
+fi
+
+pl_fwf_check_factionfile $FACTIONID
+WPS=$(grep "currentwp=" "$FWFACTIONFILEPFX$FACTIONID.txt")
+WPS=${WPS//*=}
+WPS=${WPS// }
+if [ $WPS -lt $SCANCOSTGLOBAL ]
+then
+	as_user "screen -p 0 -S $SCREENID -X stuff $'/pm $1 Your faction has not enough WP, a global scan costs $SCANCOSTGLOBAL WP!\n'"
+	return
+fi
+WPS=$(($WPS - $SCANCOSTGLOBAL))
+as_user "sed -i 's/currentwp=.*/currentwp=$WPS/g' '$FWFACTIONFILEPFX$fid.txt'"
+
+ONLINEPLAYERS=($(cat $ONLINELOG))
+SCANRESULT=""
+for player in ${ONLINEPLAYERS[@]}; do
+	POSITION=$(grep "PlayerLocation=" "$PLAYERFILE/$player")
+	POSITION=${POSITION/*=}
+	SCANRESULT="$SCANRESULT $player=($POSITION)"
+done
+as_user "screen -p 0 -S $SCREENID -X stuff $'/pm $1 Receiving scan data: $SCANRESULT\n'"
+}
+
+function COMMAND_SCANFACTION(){
+if [ "$#" -ne "2" ]
+then
+	as_user "screen -p 0 -S $SCREENID -X stuff $'/pm $1 Invalid parameters. Please use !SCANFACTION <faction id>\n'"
+fi
+
+if [ ! -e "$FACTIONFILE/$2" ]
+then
+	as_user "screen -p 0 -S $SCREENID -X stuff $'/pm $1 Faction with ID $2 does not exist!\n'"
+	return
+fi
+
+FACTIONID=$(grep "PlayerFaction=" "$PLAYERFILE/$1")
+FACTIONID=${FACTIONID/*=}
+FACTIONID=${FACTIONID// }
+if [ "$FACTIONID" == "None" ]
+then
+	as_user "screen -p 0 -S $SCREENID -X stuff $'/pm $1 You are not in a faction!\n'"
+	return
+fi
+
+sumowned=$(grep -c "_Scanner_.*$FACTIONID" "$FWCHECKPOINTSFILE")
+if [ $sumowned -eq 0 ]
+then
+	as_user "screen -p 0 -S $SCREENID -X stuff $'/pm $1 Your faction does not own a scanner-checkpoint!\n'"
+	return
+fi
+
+pl_fwf_check_factionfile $FACTIONID
+WPS=$(grep "currentwp=" "$FWFACTIONFILEPFX$FACTIONID.txt")
+WPS=${WPS//*=}
+WPS=${WPS// }
+if [ $WPS -lt $SCANCOSTGLOBAL ]
+then
+	as_user "screen -p 0 -S $SCREENID -X stuff $'/pm $1 Your faction has not enough WP, a global scan costs $SCANCOSTGLOBAL WP!\n'"
+	return
+fi
+WPS=$(($WPS - $SCANCOSTGLOBAL))
+as_user "sed -i 's/currentwp=.*/currentwp=$WPS/g' '$FWFACTIONFILEPFX$fid.txt'"
+
+collect_players_of_faction $2
+SCANRESULT=""
+for player in ${PLAYERS[@]}; do
+	POSITION=$(grep "PlayerLocation=" "$PLAYERFILE/$player")
+	POSITION=${POSITION/*=}
+	SCANRESULT="$SCANRESULT $player=($POSITION)"
+done
+as_user "screen -p 0 -S $SCREENID -X stuff $'/pm $1 Receiving scan data for faction $2: $SCANRESULT\n'"
+}
+
+function COMMAND_SCANPLAYER(){
+if [ "$#" -ne "2" ]
+then
+	as_user "screen -p 0 -S $SCREENID -X stuff $'/pm $1 Invalid parameters. Please use !SCANPLAYER <name>\n'"
+fi
+
+if [ ! -e "$PLAYERFILE/$2" ]
+then
+	as_user "screen -p 0 -S $SCREENID -X stuff $'/pm $1 Player ID $2 does not exist!\n'"
+	return
+fi
+
+FACTIONID=$(grep "PlayerFaction=" "$PLAYERFILE/$1")
+FACTIONID=${FACTIONID/*=}
+FACTIONID=${FACTIONID// }
+if [ "$FACTIONID" == "None" ]
+then
+	as_user "screen -p 0 -S $SCREENID -X stuff $'/pm $1 You are not in a faction!\n'"
+	return
+fi
+
+sumowned=$(grep -c "_Scanner_.*$FACTIONID" "$FWCHECKPOINTSFILE")
+if [ $sumowned -eq 0 ]
+then
+	as_user "screen -p 0 -S $SCREENID -X stuff $'/pm $1 Your faction does not own a scanner-checkpoint!\n'"
+	return
+fi
+
+
+BALANCE=$(grep "CreditsInBank=" "$FACTIONFILE/$FACTIONID")
+BALANCE=${BALANCE//*=}
+BALANCE=${BALANCE// }
+if [ $BALANCE -lt 400000 ]
+then
+	as_user "screen -p 0 -S $SCREENID -X stuff $'/pm $1 Your faction has not enough Credits in bank, a playerscan costs 400000!\n'"
+	return
+fi
+WPS=$(($WPS - $SCANCOSTGLOBAL))
+as_user "sed -i 's/currentwp=.*/currentwp=$WPS/g' '$FWFACTIONFILEPFX$fid.txt'"
+
+list_players_of_faction $2
+SCANRESULT=""
+for player in ${PLAYERS[@]}; do
+	POSITION=$(grep "PlayerLocation=" "$PLAYERFILE/$player")
+	POSITION=${POSITION/*=}
+	SCANRESULT="$SCANRESULT $player=($POSITION)"
+done
+as_user "screen -p 0 -S $SCREENID -X stuff $'/pm $1 Receiving scan data for faction $2: $SCANRESULT\n'"
 }

@@ -1258,6 +1258,20 @@ if [[ ! -f $PLAYERFILE/$1 ]]
 then
 #	echo "File not found"
 	write_playerfile $1
+#migrate up to 30 votepoints from old playerfile
+	if [ -e "${PLAYERFILE}_old/$1" ]
+	then
+		VOTEBALANCE=$(grep "VotingPoints=" "${PLAYERFILE}_old/$1")
+		if [ $VOTEBALANCE -gt 30 ]
+		the
+			  VOTEBALANCE=30
+		fi
+		as_user "sed -i 's/VotingPoints=.*/VotingPoints=$VOTEBALANCE/g' '$PLAYERFILE/$1'"
+	fi
+	#add to creditstatistic
+	NEWPLAYERGAIN=$(grep "ActualCreditGain_NewPlayers=" "$CREDITSTATUSFILE")
+	NEWPLAYERGAIN=$(($NEWPLAYERGAIN + 50000))
+	as_user "sed -i 's/ActualCreditGain_NewPlayers=.*/ActualCreditGain_NewPlayers=$NEWPLAYERGAIN/g' '$CREDITSTATUSFILE'"
 fi
 }
 create_factionfile(){
@@ -1523,6 +1537,16 @@ for line in ${PLAYERINVBALANCE[@]}; do
 done
 }
 
+list_players_of_faction() {
+TMP=""
+PLAYERS=($(grep "PlayerFaction=$1" "$PLAYERFILE"/*))
+for line in ${PLAYERS[@]}; do
+	name=${line/:PlayerFaction=*}
+	name=${name//*\/}
+	TMP="$TMP $name"
+done
+PLAYERS=($TMP)
+}
 #---------------------------Chat Commands---------------------------------------------
 
 #Example Command

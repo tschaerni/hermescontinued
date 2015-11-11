@@ -109,7 +109,7 @@ case "$SOURCETYP" in
 	*"Ship"*)
 		echo "$KILLEDPLAYER of faction $KILLEDFACTION got killed by a $SOURCETYP named $KILLERNAME"
 		as_user "screen -p 0 -S $SCREENID -X stuff $'/ship_info_uid \"ENTITY_SHIP_$KILLERNAME\"\n'"
-		sleep 0.5
+		sleep 1
 #[SERVER-LOCAL-ADMIN] DatabaseEntry [uid=ENTITY_SHIP_Station_Piratestation Gamma_8_5_5_144596482932710, sectorPos=(8, 5, 5), type=5, seed=0, lastModifier=, spawner=<system>, realName=Station_Piratestation Gamma_8_5_5_144596482932710, touched=true, faction=-1, pos=(0.0, -28.5, 101.0), minPos=(-1, -1, -1), maxPos=(1, 1, 1), creatorID=0]
 # --------------- If not found serach for something like this -------------
 #[SERVER-LOCAL-ADMIN] UID Not Found in DB: ENTITY_SHIP_NullPointer_1446064354948; checking unsaved objects
