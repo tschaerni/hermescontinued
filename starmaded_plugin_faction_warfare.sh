@@ -42,7 +42,7 @@ FACTIONWARFARECONFIG=$FACTIONWARFAREFILES/fwconfig.cfg
 _EOF_"
 	as_user "$CONFIGCREATE"
 fi
-source "$CONFIGPATH"
+#source "$CONFIGPATH"
 
 if [ ! -e "$FACTIONWARFAREFILES" ]
 then
@@ -691,7 +691,9 @@ for player in ${ONLINEPLAYERS[@]}; do
 	POSITION=${POSITION/*=}
 	SCANRESULT="$SCANRESULT $player=($POSITION)"
 done
-as_user "screen -p 0 -S $SCREENID -X stuff $'/pm $1 Receiving scan data: $SCANRESULT\n'"
+#as_user "screen -p 0 -S $SCREENID -X stuff $'/pm $1 Receiving scan data: $SCANRESULT\n'"
+as_user "screen -p 0 -S $SCREENID -X stuff $'/chatchannel \"Faction$FACTIONID\" \"Receiving scan data: $SCANRESULT\"\n'"
+
 }
 
 function COMMAND_SCANFACTION(){
@@ -742,7 +744,8 @@ for player in ${PLAYERS[@]}; do
 	POSITION=${POSITION/*=}
 	SCANRESULT="$SCANRESULT $player=($POSITION)"
 done
-as_user "screen -p 0 -S $SCREENID -X stuff $'/pm $1 Receiving scan data for faction $2: $SCANRESULT\n'"
+#as_user "screen -p 0 -S $SCREENID -X stuff $'/pm $1 Receiving scan data for faction $2: $SCANRESULT\n'"
+as_user "screen -p 0 -S $SCREENID -X stuff $'/chatchannel \"Faction$FACTIONID\" \"Receiving scan data for faction $2: $SCANRESULT\"\n'"
 }
 
 function COMMAND_SCANPLAYER(){
@@ -788,7 +791,8 @@ as_user "sed -i 's/CreditsInBank=.*/CreditsInBank=$BALANCE/g' '$FACTIONFILE/$FAC
 
 POSITION=$(grep "PlayerLocation=" "$PLAYERFILE/$2")
 POSITION=${POSITION/*=}
-as_user "screen -p 0 -S $SCREENID -X stuff $'/pm $1 Receiving scan data for player $2: ($POSITION)\n'"
+#as_user "screen -p 0 -S $SCREENID -X stuff $'/pm $1 Receiving scan data for player $2: ($POSITION)\n'"
+as_user "screen -p 0 -S $SCREENID -X stuff $'/chatchannel \"Faction$FACTIONID\" \"Receiving scan data for player $2: ($POSITION)\"\n'"
 
 CREDITLOSS=$(grep "ActualCreditLoss_Other=" "$CREDITSTATUSFILE")
 CREDITLOSS=$(($CREDITLOSS + 400000))

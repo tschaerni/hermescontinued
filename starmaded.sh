@@ -57,10 +57,20 @@ then
 	echo "No playerfile directory detected creating for logging"
 	as_user "mkdir $PLAYERFILE"
 fi
+if [ ! -d "${PLAYERFILE}_archive" ]
+then
+	echo "No playerfile-archive directory detected creating for logging"
+	as_user "mkdir ${PLAYERFILE}_archive"
+fi
 if [ ! -d "$FACTIONFILE" ]
 then
 	echo "No factionfile directory detected creating for logging"
 	as_user "mkdir $FACTIONFILE"
+fi
+if [ ! -d "${FACTIONFILE}_archive" ]
+then
+	echo "No factionfile-archive directory detected creating for logging"
+	as_user "mkdir ${FACTIONFILE}_archive"
 fi
 if [ ! -d "$STARTERPATH/oldlogs" ]
 then
@@ -316,7 +326,7 @@ then
 		then
 			echo "Server is responding"
 			echo "Server time variable is $CURRENTTIME"
-        else
+		else
 			echo "Server is not responding, shutting down and restarting"
 			sm_ebrake
 			sm_start
@@ -537,8 +547,7 @@ create_creditstatusfile
 				los_stationspawn $CURRENTSTRING &
 				;;
 			*"$SEARCHFACTIONTURN"*)
-				check_factions &
-				check_credits &
+				check_all &
 				#use ;& to do also the next case statement
 				;&
 			*)
@@ -1424,6 +1433,7 @@ do
 			if [ -z "$(grep "Faction $FID" "$STARTERPATH/logs/check_factions")" ]
 			then
 				as_user "echo 'Check Faction $FID' >> '$STARTERPATH/logs/check_factions'"
+				as_user "mv '$FACTIONFILE/$FID' '{$FACTIONFILE}_archive/$FID'"
 			fi
 			continue
 		fi
@@ -1571,15 +1581,20 @@ collect_player_infos() {
 as_user "echo '<root>' > /dev/shm/playerlist.xml"
 for PLAYER in $PLAYERFILE/* ; do
 	PLAYER=${PLAYER//*\/}
-	FACTION=$(grep PlayerFaction= "$PLAYERFILE/$PLAYER")
-	FACTION=${FACTION/*=}
-	KILLS=$(grep PlayerKills= "$PLAYERFILE/$PLAYER")
-	KILLS=${KILLS/*=}
-	DEATHS=$(grep PlayerDeaths= "$PLAYERFILE/$PLAYER")
-	DEATHS=${DEATHS/*=}
-	BALANCE=$(grep CreditsInBank= "$PLAYERFILE/$PLAYER")
-	BALANCE=${BALANCE/*=}
-	as_user "echo '	<entry Player=\"$PLAYER\" Faction=$FACTION Kills=$KILLS Deaths=$DEATHS Bankbalance=$BALANCE />' >> /dev/shm/playerlist.xml"
+	OLD_IFS=$IFS
+	IFS=$'\n'
+	INFOS=($(grep -e PlayerFaction= -e CreditsInBank= -e PlayerDeaths= -e PlayerKills= "$PLAYERFILE/$PLAYER"))
+	IFS=$OLD_IFS
+	INFOS="${INFOS[@]}"
+	FACTION=${INFOS/*PlayerFaction=}
+	FACTION=${FACTION// *}
+	KILLS=${INFOS/*PlayerKills=}
+	KILLS=${KILLS// *}
+	DEATHS=${INFOS/*PlayerDeaths=}
+	DEATHS=${DEATHS// *}
+	BALANCE=${INFOS/*CreditsInBank=}
+	BALANCE=${BALANCE// *}
+	as_user "echo '	<entry Player=\"$PLAYER\" Faction=\"$FACTION\" Kills=\"$KILLS\" Deaths=\"$DEATHS\" Bankbalance=\"$BALANCE\" />' >> /dev/shm/playerlist.xml"
 done
 as_user "echo '</root>' >> /dev/shm/playerlist.xml"
 }
@@ -1590,18 +1605,45 @@ for FACTION in $FACTIONFILE/* ; do
 	FACTION=${FACTION//*\/}
 	FACTIONNAME=$(grep FactionName= "$FACTIONFILE/$FACTION")
 	FACTIONNAME=${FACTIONNAME/FactionName=}
-	FPS=$(grep FactionPoints= "$FACTIONFILE/$FACTION")
-	FPS=${FPS/*=}
-	KILLS=$(grep FactionKills= "$FACTIONFILE/$FACTION")
-	KILLS=${KILLS/*=}
-	DEATHS=$(grep FactionDeaths= "$FACTIONFILE/$FACTION")
-	DEATHS=${DEATHS/*=}
-	BALANCE=$(grep CreditsInBank= "$FACTIONFILE/$FACTION")
-	BALANCE=${BALANCE/*=}
-	list_players_of_faction $FACTION
-	as_user "echo '	<entry Faction=$FACTION Name=\"$FACTIONNAME\" Factionpoints=$FPS Members=${#PLAYERS[@]} Kills=$KILLS Deaths=$DEATHS Bankbalance=$BALANCE />' >> /dev/shm/factionlist.xml"
+	OLD_IFS=$IFS
+	IFS=$'\n'
+	INFOS=($(grep -e FactionPoints= -e FactionKills= -e FactionDeaths= -e CreditsInBank= "$FACTIONFILE/$FACTION"))
+	IFS=$OLD_IFS
+	INFOS="${INFOS[@]}"
+	FPS=${INFOS/*FactionPoints=}
+	FPS=${FPS// *}
+	KILLS=${INFOS/*FactionKills=}
+	KILLS=${KILLS// *}
+	DEATHS=${INFOS/*FactionDeaths=}
+	DEATHS=${DEATHS// *}
+	BALANCE=${INFOS/*CreditsInBank=}
+	BALANCE=${BALANCE// *}
+	MEMBER=$(grep -c "Faction=\"$FACTION\"" /dev/shm/playerlist.xml)
+	MEMBER=${MEMBER// }
+	as_user "echo '	<entry Faction=\"$FACTION\" Name=\"$FACTIONNAME\" Factionpoints=\"$FPS\" Members=\"$MEMBER\" Kills=\"$KILLS\" Deaths=\"$DEATHS\" Bankbalance=\"$BALANCE\" />' >> /dev/shm/factionlist.xml"
 done
 as_user "echo '</root>' >> /dev/shm/factionlist.xml"
+}
+
+check_players() {
+SEARCHTIME=$(date +%s)
+#integer divison
+SEARCHTIME=$(($SEARCHTIME / 1000000))
+#remove 3kk seconds, this way we players will be set to inactive after 23 to 35 days. Not the  exactes way to check this but has the best performance
+SEARCHTIME=$(($SEARCHTIME - 3))
+INACTIVEPLAYERS=$(grep "PlayerLastUpdate=$SEARCHTIME" "$PLAYERFILE"/*)
+for PLAYER in ${INACTIVEPLAYERS[@]}; do
+	PLAYER=${PLAYER/:PlayerLastUpdate=*}
+	PLAYER=${PLAYER//*\/}
+	echo "$PLAYER is inactive, move to archive"
+	as_user "mv '$PLAYERFILE/$PLAYER' '${PLAYERFILE}_archive/$PLAYER'"
+done
+}
+
+check_all() {
+check_factions
+check_players
+check_credits
 }
 
 #---------------------------Chat Commands---------------------------------------------
@@ -2345,14 +2387,10 @@ case "$1" in
 	bankfee)
 		bank_fee
 	;;
-	check)
-		sm_load_plugins
-		check_credits
-		check_factions
-	;;
 	collectdata)
 		sm_load_plugins
-		pl_bounty_list_all
+#pl_bounty_list_all is called in load function of its plugin
+#		pl_bounty_list_all
 		collect_player_infos
 		collect_faction_infos
 	;;

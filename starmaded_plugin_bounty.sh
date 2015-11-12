@@ -30,7 +30,7 @@ BOUNTYFILESCONFIG=$BOUNTYFILES/bountyconfig.cfg
 _EOF_"
 	as_user "$CONFIGCREATE"
 fi
-source "$CONFIGPATH"
+#source "$CONFIGPATH"
 
 if [ ! -e "$BOUNTYFILES" ]
 then
@@ -159,6 +159,7 @@ then
 	((KILLS++))
 	as_user "sed -i 's/FactionDeaths=.*/FactionDeaths=$KILLS/g' '$FACTIONFILE/$KILLEDFACTION'"
 fi
+as_user "screen -p 0 -S $SCREENID -X stuff $'/give_laser_weapon $KILLEDPLAYER\n'"
 }
 
 pl_bounty_kill_direct() {
@@ -208,6 +209,7 @@ then
 		BANKBALANCE=${BANKBALANCE/*=}
 		NEW=$(($BANKBALANCE + $BOUNTY + $DROPEDCREDITS))
 		as_user "sed -i 's/CreditsInBank=.*/CreditsInBank=$NEW/g' '$FACTIONFILE/$KILLERFACTION'"
+		as_user "screen -p 0 -S $SCREENID -X stuff $'/chatchannel \"Faction$KILLERFACTION\" \"Your Faction got $BOUNTY Credits from bounty and $DROPEDCREDITS Credits from creditdrop transfered onto your bankaccount for killing ${KILLEDPLAYER}!\"\n'"
 		pl_bounty_list_all
 
 		KILLS=$(grep "FactionKills=" "$FACTIONFILE/$KILLERFACTION")
@@ -235,7 +237,6 @@ fi
 }
 
 pl_bounty_turn() {
-echo "Found Factionturn, now doing bounty turn"
 as_user "mv '$BOUNTYFILEPLAYER' '${BOUNTYFILEPLAYER}_tmp'"
 as_user "echo \"#This file containes bounty on players\" > $BOUNTYFILEPLAYER"
 OLD_IFS=$IFS
@@ -412,7 +413,7 @@ IFS=$OLD_IFS
 as_user "echo '<root>' > /dev/shm/totalbounty.xml"
 for PLAYER in ${PLAYERS[@]}; do
 	pl_bounty_calc_bounty
-	as_user "echo '	<entry Player=\"$PLAYER\" Totalbounty=$(($PLAYERBOUNTY + $FACTIONBOUNTY)) Playerbounty=$PLAYERBOUNTY Factionbounty=$FACTIONBOUNTY />' >> /dev/shm/totalbounty.xml"
+	as_user "echo '	<entry Player=\"$PLAYER\" Totalbounty=\"$(($PLAYERBOUNTY + $FACTIONBOUNTY))\" Playerbounty=\"$PLAYERBOUNTY\" Factionbounty=\"$FACTIONBOUNTY\" />' >> /dev/shm/totalbounty.xml"
 done
 as_user "echo '</root>' >> /dev/shm/totalbounty.xml"
 }
