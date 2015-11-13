@@ -369,6 +369,10 @@ then
 					echo "Beacon says: \"Give me credits!\""
 					as_user "screen -p 0 -S $SCREENID -X stuff $'/give_credits $PLAYER $BEACONCREDITS\n'"
 					as_user "screen -p 0 -S $SCREENID -X stuff $'/pm $PLAYER \"You just got $BEACONCREDITS Credits!\"\n'"
+					CREDITS=$(grep "CurrentCredits=" "$PLAYERFILE/$PLAYER")
+					CREDITS=${CREDITS/*=}
+					CREDITS=$(($CREDITS + $BEACONCREDITS))
+					as_user "sed -i 's/CurrentCredits=.*/CurrentCredits=$CREDITS/g' '$PLAYERFILE/$PLAYER'"
 					BEACONGAIN=$(grep "ActualCreditGain_Beacons=" "$CREDITSTATUSFILE")
 					BEACONGAIN=$(($BEACONGAIN + $BEACONCREDITS))
 					as_user "sed -i 's/ActualCreditGain_Beacons=.*/ActualCreditGain_Beacons=$BEACONGAIN/g' '$CREDITSTATUSFILE'"
@@ -567,6 +571,10 @@ function COMMAND_FW_EXCHANGE(){
 				as_user "sed -i 's/currentwp=$old_wpoints/currentwp=$new_wpoints/g' $FWFACTIONFILEPFX$FACTIONID.txt"
 				as_user "screen -p 0 -S $SCREENID -X stuff $'/give_credits $1 $(($WPEXCHANGERATECREDITS * $3))\n'"
 				as_user "screen -p 0 -S $SCREENID -X stuff $'/pm $1 Exchanged $wptosub WP into $(($WPEXCHANGERATECREDITS * $3)) ccredits\n'"
+				CREDITS=$(grep "CurrentCredits=" "$PLAYERFILE/$1")
+				CREDITS=${CREDITS/*=}
+				CREDITS=$(($CREDITS + $WPEXCHANGERATECREDITS * $3))
+				as_user "sed -i 's/CurrentCredits=.*/CurrentCredits=$CREDITS/g' '$PLAYERFILE/$1'"
 			else
 				as_user "screen -p 0 -S $SCREENID -X stuff $'/pm $1 FW_WPEXCHANGE: second argument has to be either fp, silver or credits. Use without parameters to see exchangerates!\n'"
 			fi

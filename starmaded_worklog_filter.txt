@@ -1,3 +1,4 @@
+\[VERSION\]
 \[SERVER\]\[LOGIN\] login received. returning login info for RegisteredClient: 
 \[SERVER\]\[DISCONNECT\] Client 'RegisteredClient:
 \[CHANNELROUTER\] RECEIVED MESSAGE ON Server(0): \[CHAT\]

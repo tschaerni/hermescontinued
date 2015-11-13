@@ -232,7 +232,6 @@ then
 	CURCREDITS=$(($CURCREDITS - $DROPEDCREDITS))
 	as_user "screen -p 0 -S $SCREENID -X stuff $'/give_credits $KILLEDPLAYER -$DROPEDCREDITS\n'"
 	as_user "sed -i 's/CurrentCredits=.*/CurrentCredits=$CURCREDITS/g' '$PLAYERFILE/$KILLEDPLAYER'"
-	#TODO add it to reward
 fi
 }
 

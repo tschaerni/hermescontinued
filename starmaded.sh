@@ -433,11 +433,14 @@ sm_log() {
 SM_LOG_PID=$$
 # Chat commands are controlled by /playerfile/playername which contains the their rank and
 # rankcommands.log which has ranks followed by the commands that they are allowed to call
-echo "Logging started at $(date '+%b_%d_%Y_%H.%M.%S')"
+DATESTR=$(date '+%b_%d_%Y_%H.%M.%S')
+echo "Logging started at $DATESTR"
 autovoteretrieval &
 randomhelptips &
 create_rankscommands
 create_creditstatusfile
+as_user "echo 'Server started at $DATESTR' >> $BANKLOG"
+as_user "echo 'Server started at $DATESTR' >> $LOGPLAYERCREDIT"
 # Create the playerfile folder if it doesnt exist
 	mkdir -p $PLAYERFILE
 	OLDBYTECOUNT=0
@@ -517,7 +520,7 @@ create_creditstatusfile
 #				echo $CURRENTSTRING
 				log_playerlogout $CURRENTSTRING &
 				;;
- 			*"$SEARCHCHAT"*)
+			*"$SEARCHCHAT"*)
 #				echo "Chat detected"
 #				echo $CURRENTSTRING
 				log_chatcommands $CURRENTSTRING &
@@ -585,7 +588,7 @@ parselog(){
 #				echo $@
 				log_playerlogout $@ &
 				;;
- 			*"$SEARCHCHAT"*)
+			*"$SEARCHCHAT"*)
 #				echo "Chat detected"
 #				echo $@
 				log_chatcommands $@ &
@@ -686,6 +689,7 @@ log_playerinfo() {
 create_playerfile $1
 as_user "screen -p 0 -S $SCREENID -X stuff $'/player_info $1\n'"
 sleep 2
+PCREDITS=0
 if tac /dev/shm/output.log | grep -m 1 -A 10 "Name: $1" >/dev/null
 then
 	extra_newlines=0
@@ -744,6 +748,21 @@ then
 		PCONTROLTYPE="Spacesuit"
 	fi
 	PLASTUPDATE=$(date +%s)
+
+	OLDCREDITS=$(grep CurrentCredits= $PLAYERFILE/$1)
+	OLDCREDITS=${OLDCREDITS/*=}
+	if [ $OLDCREDITS -ne $PCREDITS ]
+	then
+	#Known credits doesn't match actual credits. The difference is loss through stationspawns and trade with shops
+		as_user "echo 'time=$PLASTUPDATE player=$1 CreditExpected=$OLDCREDITS CurrentCredits=$PCREDITS' >> $BANKLOG"
+		ACD=$(grep "ActualCreditDifference_Inventory=" $CREDITSTATUSFILE)
+		ACD=$(($ACD + $PCREDITS - $OLDCREDITS))
+		as_user "sed -i 's/ActualCreditDifference_Inventory=.*/ActualCreditDifference_Inventory=$ACD/g' $CREDITSTATUSFILE"
+		ACD=$(grep "CreditDifference=" $PLAYERFILE/$1)
+		ACD=$(($ACD + $PCREDITS - $OLDCREDITS))
+		as_user "sed -i 's/CreditDifference=.*/CreditDifference=/g' $PLAYERFILE/$1"
+	fi
+
 #echo "Player file last update is $PLASTUPDATE"
 	as_user "sed -i 's/SMName=.*/SMName=$SMNAME/g' $PLAYERFILE/$1"
 	as_user "sed -i 's/CurrentIP=.*/CurrentIP=$PIP/g' $PLAYERFILE/$1"
@@ -898,7 +917,7 @@ fi
 # Use sed to change the playerfile PlayerLoggedIn to No
 as_user "sed -i 's/PlayerLoggedIn=Yes/PlayerLoggedIn=No/g' $PLAYERFILE/$LOGOUTPLAYER"
 # Echo current string and array to the guestboot as a log off
-LOGOFF="$LOGOUTPLAYER logged off at $(date '+%b_%d_%Y_%H.%M.%S') server time"
+LOGOFF="time=$(date +%s) player=$LOGOUTPLAYER logged off at $(date '+%b_%d_%Y_%H.%M.%S') server time"
 as_user "echo $LOGOFF >> $GUESTBOOK"
 as_user "sed -i '/$LOGOUTPLAYER/d' $ONLINELOG"
 }
@@ -911,7 +930,7 @@ create_playerfile $LOGINPLAYER
 DATE=$(date '+%b_%d_%Y_%H.%M.%S')
 as_user "sed -i 's/JustLoggedIn=.*/JustLoggedIn=Yes/g' $PLAYERFILE/$LOGINPLAYER"
 as_user "sed -i 's/PlayerLastLogin=.*/PlayerLastLogin=$DATE/g' $PLAYERFILE/$LOGINPLAYER"
-LOGON="$LOGINPLAYER logged on at $(date '+%b_%d_%Y_%H.%M.%S') server time"
+LOGON="time=$(date +%s) player=$LOGINPLAYER logged on at $(date '+%b_%d_%Y_%H.%M.%S') server time"
 as_user "echo $LOGON >> $GUESTBOOK"
 as_user "echo $LOGINPLAYER >> $ONLINELOG"
 as_user "sort $ONLINELOG -o $ONLINELOG"
@@ -922,6 +941,9 @@ INITPLAYER=${TMP//*PlS[}
 INITPLAYER=${INITPLAYER// *}
 sleep 0.5
 log_playerinfo $INITPLAYER
+TIMESTAMP=$(date +%s)
+BALANCECREDITS=$(grep CreditsInBank= $PLAYERFILE/$INITPLAYER )
+as_user "echo 'time=$TIMESTAMP player=$INITPLAYER Credits=$PCREDITS $BALANCECREDITS' >> '$LOGPLAYERCREDIT'"
 if grep -q "JustLoggedIn=Yes" $PLAYERFILE/$INITPLAYER
 then
 	LOGINMESSAGE="Welcome to the server $INITPLAYER! Type !HELP for chat commands"
@@ -954,6 +976,11 @@ SECTOR="$@"
 SECTOR=${SECTOR//*(}
 SECTOR=${SECTOR/)}
 SECTOR=${SECTOR// }
+TIMESTAMP=$(date +%s)
+OLDSEC=$(grep PlayerLocation= $PLAYERFILE/$PLAYER)
+OLDSEC=${OLDSEC/PlayerLocation=}
+
+as_user "echo 'time=$TIMESTAMP player=$PLAYER from=$OLDSEC to=$SECTOR' >> '$SECTORLOG'"
 as_user "sed -i 's/PlayerLocation=.*/PlayerLocation=$SECTOR/g' $PLAYERFILE/$PLAYER"
 }
 
@@ -1151,6 +1178,9 @@ FACTIONFILE=$STARTERPATH/factionfiles #The folder that contains individual facti
 CREDITSTATUSFILE=$STARTERPATH/logs/creditstatus.log #Contains all relevant infos about absolute creditflow
 CREDITSTATISTICFILE=$STARTERPATH/logs/creditstatistic.log #Contains snapshots of total credits amount
 PLANETGRAVLOG=$STARTERPATH/logs/planetgravity.log #Contains all ships that entered the gravity of a planet once
+LOGPLAYERCREDIT=$STARTERPATH/logs/playercredit.log #Contains credits and bankbalance on every login
+STATIONLOG=$STARTERPATH/logs/station.log #Contains all stations
+SECTORLOG=$STARTERPATH/logs/sector.log #Contains all sector changes
 #------------------------Game settings----------------------------------------------------------------------------
 VOTECHECKDELAY=10 #The time in seconds between each check of starmade-servers.org
 CREDITSPERVOTE=1000000 # The number of credits a player gets per voting point.
@@ -1173,7 +1203,8 @@ VotingPoints=0
 CurrentVotes=0
 SMName=None
 CurrentIP=0.0.0.0
-CurrentCredits=0
+CurrentCredits=50000
+CreditDifference=0
 PlayerFaction=None
 PlayerLocation=2,2,2
 PlayerControllingType=Spacesuit
@@ -1238,6 +1269,8 @@ ActualCreditGain_NewPlayers=0
 ActualCreditGain_Beacons=0
 ActualCreditGain_Checkpoints=0
 ActualCreditGain_Other=0
+# === Actual Credit difference ===
+ActualCreditDifference_Inventory=0
 # === Total Credit gain ===
 TotalCreditLoss_Sum=0
 TotalCreditLoss_Station=0
@@ -1254,6 +1287,8 @@ TotalCreditGain_NewPlayers=0
 TotalCreditGain_Beacons=0
 TotalCreditGain_Checkpoints=0
 TotalCreditGain_Other=0
+# === Total Credit difference ===
+TotalCreditDifference_Inventory=0
 _EOF_"
 as_user "$CREATEFILE"
 }
@@ -1484,7 +1519,37 @@ fi
 
 check_credits() {
 create_creditstatusfile
+source $CREDITSTATUSFILE
 #$CREDITSTATUSFILE
+# ===Creditstatusfile===
+# === Credits avlaibale to refill into the game ===
+#CreditsInBank=0
+# === Actual Credit loss ===
+ActualCreditLoss_Sum=$(($ActualCreditLoss_Station + $ActualCreditLoss_InactiveFaction + $ActualCreditLoss_WeaponMeta + $ActualCreditLoss_BankDepositFee + $ActualCreditLoss_InactivePlayerBank + $ActualCreditLoss_InactivePlayerCredits + $ActualCreditLoss_TitanInterest + $ActualCreditLoss_Other))
+# === Actual Credit gain ===
+ActualCreditGain_Sum=$(($ActualCreditGain_NewPlayers + $ActualCreditGain_Beacons + $ActualCreditGain_Checkpoints + $ActualCreditGain_Other))
+as_user "sed -i 's/ActualCreditLoss_Sum=.*/ActualCreditLoss_Sum=$ActualCreditLoss_Sum/g' '$CREDITSTATUSFILE'"
+as_user "sed -i 's/ActualCreditGain_Sum=.*/ActualCreditGain_Sum=$ActualCreditGain_Sum/g' '$CREDITSTATUSFILE'"
+# === Actual Credit difference ===
+#ActualCreditDifference_Inventory=0
+# === Total Credit gain ===
+#TotalCreditLoss_Sum=0
+#TotalCreditLoss_Station=0
+#TotalCreditLoss_InactiveFaction=0
+#TotalCreditLoss_WeaponMeta=0
+#TotalCreditLoss_BankDepositFee=0
+#TotalCreditLoss_InactivePlayerBank=0
+#TotalCreditLoss_InactivePlayerCredits=0
+#TotalCreditLoss_TitanInterest=0
+#TotalCreditLoss_Other=0
+# === Total Credit loss ===
+#TotalCreditGain_Sum=0
+#TotalCreditGain_NewPlayers=0
+#TotalCreditGain_Beacons=0
+#TotalCreditGain_Checkpoints=0
+#TotalCreditGain_Other=0
+# === Total Credit difference ===
+#TotalCreditDifference_Inventory=0
 update_credit_statistic
 }
 
@@ -1710,7 +1775,8 @@ function COMMAND_DEPOSIT(){
 					as_user "screen -p 0 -S $SCREENID -X stuff $'/give_credits $1 -$2\n'"
 					as_user "screen -p 0 -S $SCREENID -X stuff $'/pm $1 GALATIC BANK You successfully deposited $2 credits with a tax of $BANKTAX\n'"
 					as_user "screen -p 0 -S $SCREENID -X stuff $'/pm $1 GALATIC BANK Your balance is now $NEWBALANCE\n'"
-					as_user "echo '$1 deposited $2' >> $BANKLOG"
+					TIMESTAMP=$(date +%s)
+					as_user "echo 'time=$TIMESTAMP player=$1 deposited=$2 Credits=$NEWCREDITS CreditsInBank=$NEWBALANCE' >> $BANKLOG"
 					CREDITLOSS=$(grep ActualCreditLoss_BankDepositFee= $CREDITSTATUSFILE)
 					CREDITLOSS=${CREDITLOSS//*=}
 					CREDITLOSS=$(($CREDITLOSS + $BANKTAX))
@@ -1743,17 +1809,22 @@ function COMMAND_WITHDRAW(){
 		else
 #			echo "Withdraw $2"
 			as_user "screen -p 0 -S $SCREENID -X stuff $'/pm $1 GALACTIC BANK - Connecting to servers\n'"
-			BALANCECREDITS=$(grep CreditsInBank $PLAYERFILE/$1 | cut -d= -f2 | tr -d ' ')
+			BALANCECREDITS=$(grep CreditsInBank= $PLAYERFILE/$1)
+			BALANCECREDITS=${BALANCECREDITS/CreditsInBank=}
 #			echo "bank balance is $BALANCECREDITS"
 			if [ "$2" -le "$BALANCECREDITS" ]
 			then
+				log_playerinfo $1
 				NEWBALANCE=$(( $BALANCECREDITS - $2 ))
+				NEWCREDITS=$(($PCREDITS + $2))
 #				echo "new balance for bank account is $NEWBALANCE"
 				as_user "screen -p 0 -S $SCREENID -X stuff $'/give_credits $1 $2\n'"
 				as_user "sed -i 's/CreditsInBank=$BALANCECREDITS/CreditsInBank=$NEWBALANCE/g' $PLAYERFILE/$1"
+				as_user "sed -i 's/CurrentCredits=.*/CurrentCredits=$NEWCREDITS/g' $PLAYERFILE/$1"
 				as_user "screen -p 0 -S $SCREENID -X stuff $'/pm $1 GALATIC BANK You successfully withdrawn $2 credits\n'"
 				as_user "screen -p 0 -S $SCREENID -X stuff $'/pm $1 GALATIC BANK Your balance is $NEWBALANCE credits\n'"
-				as_user "echo '$1 witdrew $2' >> $BANKLOG"
+				TIMESTAMP=$(date +%s)
+				as_user "echo 'time=$TIMESTAMP player=$1 witdrew=$2 Credits=$NEWCREDITS CreditsInBank=$NEWBALANCE' >> $BANKLOG"
 			else
 				as_user "screen -p 0 -S $SCREENID -X stuff $'/pm $1 GALACTIC BANK - You have insufficient funds\n'"
 			fi
@@ -1788,7 +1859,8 @@ function COMMAND_TRANSFER(){
 				as_user "sed -i 's/CreditsInBank=$TRANSFERBALANCE/CreditsInBank=$NEWBALANCETO/g' $PLAYERFILE/$2"
 				as_user "screen -p 0 -S $SCREENID -X stuff $'/pm $1 GALATIC BANK - You sent $3 credits to $2\n'"
 				as_user "screen -p 0 -S $SCREENID -X stuff $'/pm $1 GALATIC BANK - Your balance is now $NEWBALANCEFROM\n'"
-				as_user "echo '$1 transferred to $2 in the amount of $3' >> $BANKLOG"
+				TIMESTAMP=$(date +%s)
+				as_user "echo 'time=$TIMESTAMP player=$1 transferred to=$2 amount=$3; FromCreditsInBank=$NEWBALANCEFROM ToCreditsInBank=$NEWBALANCETO' >> $BANKLOG"
 			else
 				as_user "screen -p 0 -S $SCREENID -X stuff $'/pm $1 GALACTIC BANK - Not enough credits\n'"
 			fi
@@ -1851,7 +1923,8 @@ function COMMAND_FDEPOSIT(){
 						#as_user "screen -p 0 -S $SCREENID -X stuff $'/give_credits $1 -$2\n'"
 						as_user "screen -p 0 -S $SCREENID -X stuff $'/pm $1 GALATIC BANK You successfully deposited $2 credits\n'"
 						as_user "screen -p 0 -S $SCREENID -X stuff $'/pm $1 GALATIC BANK Your factions balance is now $NEWBALANCE\n'"
-						as_user "echo '$1 deposited $2 into $FACTION bank account' >> $BANKLOG"
+						TIMESTAMP=$(date +%s)
+						as_user "echo 'time=$TIMESTAMP player=$1 deposited=$2 faction=$FACTION PlayerCreditsInBank=$NEWCREDITS FactionCreditsInBank=$NEWBALANCE' >> $BANKLOG"
 					else
 						as_user "screen -p 0 -S $SCREENID -X stuff $'/pm $1 GALATIC BANK Insufficient money\n'"
 #						echo "not enough money"
@@ -1898,7 +1971,8 @@ function COMMAND_FWITHDRAW(){
 					as_user "sed -i 's/CreditsInBank=.*/CreditsInBank=$PLAYERBALANCE/g' $PLAYERFILE/$1"
 					as_user "screen -p 0 -S $SCREENID -X stuff $'/pm $1 GALATIC BANK You successfully withdrawn $2 credits\n'"
 					as_user "screen -p 0 -S $SCREENID -X stuff $'/pm $1 GALATIC BANK The factions balance is $NEWBALANCE credits\n'"
-					as_user "echo '$1 witdrew $2 from $FACTION' >> $BANKLOG"
+					TIMESTAMP=$(date +%s)
+					as_user "echo 'time=$TIMESTAMP player=$1 witdrew=$2 faction=$FACTION PlayerCreditsInBank=$PLAYERBALANCE FactionCreditsInBank=$NEWBALANCE' >> $BANKLOG"
 				else
 					as_user "screen -p 0 -S $SCREENID -X stuff $'/pm $1 GALACTIC BANK - Your faction has insufficent funds\n'"
 				fi
