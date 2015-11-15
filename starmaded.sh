@@ -756,11 +756,13 @@ then
 	#Known credits doesn't match actual credits. The difference is loss through stationspawns and trade with shops
 		as_user "echo 'time=$PLASTUPDATE player=$1 CreditExpected=$OLDCREDITS CurrentCredits=$PCREDITS' >> $BANKLOG"
 		ACD=$(grep "ActualCreditDifference_Inventory=" $CREDITSTATUSFILE)
+		ACD=${ACD/ActualCreditDifference_Inventory=}
 		ACD=$(($ACD + $PCREDITS - $OLDCREDITS))
 		as_user "sed -i 's/ActualCreditDifference_Inventory=.*/ActualCreditDifference_Inventory=$ACD/g' $CREDITSTATUSFILE"
 		ACD=$(grep "CreditDifference=" $PLAYERFILE/$1)
+		ACD=${ACD/CreditDifference=}
 		ACD=$(($ACD + $PCREDITS - $OLDCREDITS))
-		as_user "sed -i 's/CreditDifference=.*/CreditDifference=/g' $PLAYERFILE/$1"
+		as_user "sed -i 's/CreditDifference=.*/CreditDifference=$ACD/g' $PLAYERFILE/$1"
 	fi
 
 #echo "Player file last update is $PLASTUPDATE"
@@ -947,10 +949,21 @@ as_user "echo 'time=$TIMESTAMP player=$INITPLAYER Credits=$PCREDITS $BALANCECRED
 if grep -q "JustLoggedIn=Yes" $PLAYERFILE/$INITPLAYER
 then
 	LOGINMESSAGE="Welcome to the server $INITPLAYER! Type !HELP for chat commands"
+	SMPLAYERPRESENT=$(grep SMName=$SMNAME "$STARTERPATH/logs/SMRegistry.log" 2>/dev/null)
+	if [ -z "$SMPLAYERPRESENT" ]
+	then
+		as_user "sed -i 's/CurrentCredits=.*/CurrentCredits=$(($PCREDITS + 300000))/g' $PLAYERFILE/$INITPLAYER"
+		NEWPLAYERGAIN=$(grep "ActualCreditGain_NewPlayers=" "$CREDITSTATUSFILE")
+		NEWPLAYERGAIN=$(($NEWPLAYERGAIN + 300000))
+		as_user "sed -i 's/ActualCreditGain_NewPlayers=.*/ActualCreditGain_NewPlayers=$NEWPLAYERGAIN/g' '$CREDITSTATUSFILE'"
+		as_user "screen -p 0 -S $SCREENID -X stuff $'/give_credits $INITPLAYER 300000\n'"
+		as_user "echo 'SMName=$SMNAME' >> '$STARTERPATH/logs/SMRegistry.log'"
+	fi
 	# A chat message that is displayed whenever a player logs in
 	as_user "screen -p 0 -S $SCREENID -X stuff $'/pm $INITPLAYER $LOGINMESSAGE\n'"
 	as_user "sed -i 's/JustLoggedIn=.*/JustLoggedIn=No/g' $PLAYERFILE/$INITPLAYER"
 fi
+as_user "screen -p 0 -S $SCREENID -X stuff $'/pm $INITPLAYER If you need a starterpack, type !STARTERPACK. Please don't abuse this command.\n'"
 }
 
 log_factionchange() {
@@ -1000,6 +1013,22 @@ fi
 }
 
 los_stationspawn() {
+#ENTITY_SPACESTATION_Station_Piratestation
+#ENTITY_SPACESTATION_Station_Tradestation
+#ENTITY_SPACESTATION_Station_Derelict
+TMP="$@"
+TMP=${TMP/\[BLUEPRINT\] UID: ENTITY_SPACESTATION_}
+FIRST=${TMP//_*}
+SECOND=${TMP/Station_}
+SECOND=${SECOND//_*}
+SECOND=${SECOND// *}
+if [ "$FIRST" == "Station" ]
+then
+	if [ "$SECOND" == "Piratestation" ] || [ "$SECOND" == "Tradestation" ] ||  [ "$SECOND" == "Derelict" ]
+	then
+		return
+	fi
+fi
 CREDITLOSS=$(grep "ActualCreditLoss_Station=" "$CREDITSTATUSFILE")
 CREDITLOSS=$(($CREDITLOSS + 1000000))
 as_user "sed -i 's/ActualCreditLoss_Station=.*/ActualCreditLoss_Station=$CREDITLOSS/g' '$CREDITSTATUSFILE'"
@@ -1468,7 +1497,7 @@ do
 			if [ -z "$(grep "Faction $FID" "$STARTERPATH/logs/check_factions")" ]
 			then
 				as_user "echo 'Check Faction $FID' >> '$STARTERPATH/logs/check_factions'"
-				as_user "mv '$FACTIONFILE/$FID' '{$FACTIONFILE}_archive/$FID'"
+				as_user "mv '$FACTIONFILE/$FID' '${FACTIONFILE}_archive/$FID'"
 			fi
 			continue
 		fi
@@ -2258,6 +2287,31 @@ function COMMAND_CORE(){
 		fi
 	fi
 }
+function COMMAND_STARTERPACK(){
+#Provides you with a ship core. Only usable once every 10 minutes
+#USAGE: !CORE
+	if [ "$#" -ne "1" ]
+	then
+		as_user "screen -p 0 -S $SCREENID -X stuff $'/pm $1 Invalid parameters. Please use !STARTERPACK\n'"
+	else
+		OLDPLAYERLASTCORE=$(grep PlayerLastCore $PLAYERFILE/$1 | cut -d= -f2- | tr -d ' ')
+		CURRENTTIME=$(date +%s)
+		ADJUSTEDTIME=$(( $CURRENTTIME - 1800 ))
+		if [ "$ADJUSTEDTIME" -gt "$OLDPLAYERLASTCORE" ]
+		then
+			as_user "screen -p 0 -S $SCREENID -X stuff $'/giveid $1 1 1\n'"
+			as_user "screen -p 0 -S $SCREENID -X stuff $'/give $1 \"Power Reactor\" 20\n'"
+			as_user "screen -p 0 -S $SCREENID -X stuff $'/give $1 \"Thruster\" 10\n'"
+			as_user "screen -p 0 -S $SCREENID -X stuff $'/give $1 \"Grey Hull\" 25\n'"
+			as_user "screen -p 0 -S $SCREENID -X stuff $'/give $1 \"Jump Drive Computer\" 1\n'"
+			as_user "screen -p 0 -S $SCREENID -X stuff $'/give $1 \"Jump Drive Module\" 1\n'"
+			as_user "sed -i 's/PlayerLastCore=$OLDPLAYERLASTCORE/PlayerLastCore=$CURRENTTIME/g' $PLAYERFILE/$1"
+			as_user "screen -p 0 -S $SCREENID -X stuff $'/pm $1 You have received a starterpack. There is a 30 minute cooldown before you can use it again\n'"
+		else
+			as_user "screen -p 0 -S $SCREENID -X stuff $'/pm $1 Please allow Starterpack command to cooldown. $((1800-($(date +%s)-$(grep "PlayerLastCore=" $PLAYERFILE/$1 | cut -d= -f2)))) seconds left\n'"
+		fi
+	fi
+}
 
 #Vanilla Admin Commands
 function COMMAND_GIVEMETA(){
@@ -2461,6 +2515,10 @@ case "$1" in
 	bankfee)
 		bank_fee
 	;;
+	wpround)
+		sm_load_plugins
+		pl_fwf_warfare_round
+	;;
 	collectdata)
 		sm_load_plugins
 #pl_bounty_list_all is called in load function of its plugin
@@ -2474,7 +2532,7 @@ case "$1" in
 	;;
 	*)
 		echo "Doomsider's and Titanmasher's Starmade Daemon (DSD) V.17"
-		echo "Usage: starmaded.sh {help|start|stop|ebrake|restore|status|restart|upgrade|upgradestar|cronstop|cronbackup|cronrestore|bankfee|backup|backupstar|detect|log|screenlog|dump|box|collectdata}"
+		echo "Usage: starmaded.sh {help|start|stop|ebrake|restore|status|restart|upgrade|upgradestar|cronstop|cronbackup|cronrestore|bankfee|backup|backupstar|detect|log|screenlog|dump|box|collectdata|wpround}"
 		#******************************************************************************
 		exit 1
 	;;

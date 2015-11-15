@@ -19,10 +19,10 @@ case "$1" in
 	*"$SEARCHGRAVITYCHANGE"*)
 		pl_fwf_log_gravity_changed "$1" &
 		;;
-	*"$SEARCHFACTIONTURN"*)
+#	*"$SEARCHFACTIONTURN"*)
 #actualize the list
-		pl_fwf_warfare_round &
-		;;
+#		pl_fwf_warfare_round &
+#		;;
 	*)
 		;;
 esac
@@ -89,6 +89,8 @@ fi
 pl_fwf_warfare_round() {
 #run as long as the sm_log thread is running
 #Count the occurrences of factionid or name in checkpoint.txt
+as_user "screen -p 0 -S $SCREENID -X stuff $'/start_countdown 300 \"Warpointturn ends in:\" \n'"
+sleep 300
 as_user "screen -p 0 -S $SCREENID -X stuff $'/server_message_broadcast info \"Faction Warfare Round ended!\"\n'"
 pl_fwf_reload_checkpoints
 #If only special warfactions are attending

@@ -85,14 +85,8 @@ KILLEDFACTION=($TMPSTR)
 KILLEDPLAYER=${KILLEDFACTION[1]}
 KILLEDPLAYER=${KILLEDPLAYER/PlS[}
 #Get faction of killed player
-KILLEDFACTION=${KILLEDFACTION[3]}
-#if the server doesn't use the StarMader Registry
-if [ "$KILLEDFACTION" == "Announcing" ]
-then
-	KILLEDFACTION=${KILLEDFACTION[2]}
-fi
-KILLEDFACTION=${KILLEDFACTION/*f(}
-KILLEDFACTION=${KILLEDFACTION/)]}
+KILLEDFACTION=${TMPSTR//*f(}
+KILLEDFACTION=${KILLEDFACTION//)]*}
 if [ $KILLEDFACTION -eq 0 ]
 then
 	KILLEDFACTION="None"
@@ -172,6 +166,12 @@ then
 	then
 		pl_bounty_calc_take_bounty
 		pl_bounty_credit_drops
+
+		KILLS=$(grep "PlayerKills=" "$PLAYERFILE/$KILLERNAME")
+		KILLS=${KILLS/*=}
+		((KILLS++))
+		as_user "sed -i 's/PlayerKills=.*/PlayerKills=$KILLS/g' '$PLAYERFILE/$KILLERNAME'"
+
 		BOUNTY=$(($PLAYERBOUNTY + $FACTIONBOUNTY))
 		if [ $BOUNTY -le 0 ] && [ $DROPEDCREDITS -le 0 ]
 		then
@@ -184,11 +184,6 @@ then
 		as_user "sed -i 's/CreditsInBank=.*/CreditsInBank=$NEW/g' '$PLAYERFILE/$KILLERNAME'"
 		as_user "screen -p 0 -S $SCREENID -X stuff $'/pm $KILLERNAME You got $BOUNTY Credits from bounty and $DROPEDCREDITS Credits from creditdrop transfered onto your bankaccount for killing ${KILLEDPLAYER}!\n'"
 		pl_bounty_list_all
-
-		KILLS=$(grep "PlayerKills=" "$PLAYERFILE/$KILLERNAME")
-		KILLS=${KILLS/*=}
-		((KILLS++))
-		as_user "sed -i 's/PlayerKills=.*/PlayerKills=$KILLS/g' '$PLAYERFILE/$KILLERNAME'"
 	fi
 fi
 }
@@ -200,6 +195,12 @@ then
 	then
 		pl_bounty_calc_take_bounty
 		pl_bounty_credit_drops
+
+		KILLS=$(grep "FactionKills=" "$FACTIONFILE/$KILLERFACTION")
+		KILLS=${KILLS/*=}
+		((KILLS++))
+		as_user "sed -i 's/FactionKills=.*/FactionKills=$KILLS/g' '$FACTIONFILE/$KILLERFACTION'"
+
 		BOUNTY=$(($PLAYERBOUNTY + $FACTIONBOUNTY))
 		if [ $BOUNTY -le 0 ]
 		then
@@ -211,11 +212,6 @@ then
 		as_user "sed -i 's/CreditsInBank=.*/CreditsInBank=$NEW/g' '$FACTIONFILE/$KILLERFACTION'"
 		as_user "screen -p 0 -S $SCREENID -X stuff $'/chatchannel \"Faction$KILLERFACTION\" \"Your Faction got $BOUNTY Credits from bounty and $DROPEDCREDITS Credits from creditdrop transfered onto your bankaccount for killing ${KILLEDPLAYER}!\"\n'"
 		pl_bounty_list_all
-
-		KILLS=$(grep "FactionKills=" "$FACTIONFILE/$KILLERFACTION")
-		KILLS=${KILLS/*=}
-		((KILLS++))
-		as_user "sed -i 's/FactionKills=.*/FactionKills=$KILLS/g' '$FACTIONFILE/$KILLERFACTION'"
 	fi
 fi
 }
