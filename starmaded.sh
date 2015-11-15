@@ -1344,6 +1344,11 @@ fi
 create_playerfile(){
 if [[ ! -f $PLAYERFILE/$1 ]]
 then
+	if [ -e "${PLAYERFILE}_archive/$1" ]
+	then
+		as_user "mv '${PLAYERFILE}_archive/$1' '$PLAYERFILE/$1'"
+		return
+	fi
 #	echo "File not found"
 	write_playerfile $1
 #migrate up to 30 votepoints from old playerfile
@@ -1654,7 +1659,7 @@ for line in ${PLAYERINVBALANCE[@]}; do
 	then
 		name=${line/:CurrentCredits=*}
 		name=${name//*\/}
-		echo "Someone has $credits"
+		echo "$name has $credits"
 	fi
 	CREDITSOFPLAYERS=$((CREDITSOFPLAYERS + $credits))
 done
@@ -1688,7 +1693,10 @@ for PLAYER in $PLAYERFILE/* ; do
 	DEATHS=${DEATHS// *}
 	BALANCE=${INFOS/*CreditsInBank=}
 	BALANCE=${BALANCE// *}
-	as_user "echo '	<entry Player=\"$PLAYER\" Faction=\"$FACTION\" Kills=\"$KILLS\" Deaths=\"$DEATHS\" Bankbalance=\"$BALANCE\" />' >> /dev/shm/playerlist.xml"
+	if [ "$FACTION" == "None" ] || [ "$FACTION" -gt 10001 ]
+	then
+		as_user "echo '	<entry Player=\"$PLAYER\" Faction=\"$FACTION\" Kills=\"$KILLS\" Deaths=\"$DEATHS\" Bankbalance=\"$BALANCE\" />' >> /dev/shm/playerlist.xml"
+	fi
 done
 as_user "echo '</root>' >> /dev/shm/playerlist.xml"
 }
@@ -1697,24 +1705,27 @@ collect_faction_infos() {
 as_user "echo '<root>' > /dev/shm/factionlist.xml"
 for FACTION in $FACTIONFILE/* ; do
 	FACTION=${FACTION//*\/}
-	FACTIONNAME=$(grep FactionName= "$FACTIONFILE/$FACTION")
-	FACTIONNAME=${FACTIONNAME/FactionName=}
-	OLD_IFS=$IFS
-	IFS=$'\n'
-	INFOS=($(grep -e FactionPoints= -e FactionKills= -e FactionDeaths= -e CreditsInBank= "$FACTIONFILE/$FACTION"))
-	IFS=$OLD_IFS
-	INFOS="${INFOS[@]}"
-	FPS=${INFOS/*FactionPoints=}
-	FPS=${FPS// *}
-	KILLS=${INFOS/*FactionKills=}
-	KILLS=${KILLS// *}
-	DEATHS=${INFOS/*FactionDeaths=}
-	DEATHS=${DEATHS// *}
-	BALANCE=${INFOS/*CreditsInBank=}
-	BALANCE=${BALANCE// *}
-	MEMBER=$(grep -c "Faction=\"$FACTION\"" /dev/shm/playerlist.xml)
-	MEMBER=${MEMBER// }
-	as_user "echo '	<entry Faction=\"$FACTION\" Name=\"$FACTIONNAME\" Factionpoints=\"$FPS\" Members=\"$MEMBER\" Kills=\"$KILLS\" Deaths=\"$DEATHS\" Bankbalance=\"$BALANCE\" />' >> /dev/shm/factionlist.xml"
+	if [ "$FACTION" -gt 10001 ]
+	then
+		FACTIONNAME=$(grep FactionName= "$FACTIONFILE/$FACTION")
+		FACTIONNAME=${FACTIONNAME/FactionName=}
+		OLD_IFS=$IFS
+		IFS=$'\n'
+		INFOS=($(grep -e FactionPoints= -e FactionKills= -e FactionDeaths= -e CreditsInBank= "$FACTIONFILE/$FACTION"))
+		IFS=$OLD_IFS
+		INFOS="${INFOS[@]}"
+		FPS=${INFOS/*FactionPoints=}
+		FPS=${FPS// *}
+		KILLS=${INFOS/*FactionKills=}
+		KILLS=${KILLS// *}
+		DEATHS=${INFOS/*FactionDeaths=}
+		DEATHS=${DEATHS// *}
+		BALANCE=${INFOS/*CreditsInBank=}
+		BALANCE=${BALANCE// *}
+		MEMBER=$(grep -c "Faction=\"$FACTION\"" /dev/shm/playerlist.xml)
+		MEMBER=${MEMBER// }
+		as_user "echo '	<entry Faction=\"$FACTION\" Name=\"$FACTIONNAME\" Factionpoints=\"$FPS\" Members=\"$MEMBER\" Kills=\"$KILLS\" Deaths=\"$DEATHS\" Bankbalance=\"$BALANCE\" />' >> /dev/shm/factionlist.xml"
+	fi
 done
 as_user "echo '</root>' >> /dev/shm/factionlist.xml"
 }
