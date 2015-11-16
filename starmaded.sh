@@ -963,7 +963,7 @@ then
 	as_user "screen -p 0 -S $SCREENID -X stuff $'/pm $INITPLAYER $LOGINMESSAGE\n'"
 	as_user "sed -i 's/JustLoggedIn=.*/JustLoggedIn=No/g' $PLAYERFILE/$INITPLAYER"
 fi
-as_user "screen -p 0 -S $SCREENID -X stuff $'/pm $INITPLAYER If you need a starterpack, type !STARTERPACK. Please don't abuse this command.\n'"
+as_user "screen -p 0 -S $SCREENID -X stuff $'/pm $INITPLAYER If you need a starterpack, type !STARTERPACK. Please don\'t abuse this command.\n'"
 }
 
 log_factionchange() {
@@ -985,14 +985,19 @@ log_sectorchange() {
 PLAYER="$@"
 PLAYER=${PLAYER//*PlS[}
 PLAYER=${PLAYER// *}
-SECTOR="$@"
-SECTOR=${SECTOR//*(}
-SECTOR=${SECTOR/)}
-SECTOR=${SECTOR// }
-TIMESTAMP=$(date +%s)
 OLDSEC=$(grep PlayerLocation= $PLAYERFILE/$PLAYER)
 OLDSEC=${OLDSEC/PlayerLocation=}
-
+if [[ "$@" =~ " RAIL ELEMENT " ]]
+then
+	log_playerinfo $PLAYER
+	SECTOR=$PSECTOR
+else
+	SECTOR="$@"
+	SECTOR=${SECTOR//*(}
+	SECTOR=${SECTOR/)}
+	SECTOR=${SECTOR// }
+fi
+TIMESTAMP=$(date +%s)
 as_user "echo 'time=$TIMESTAMP player=$PLAYER from=$OLDSEC to=$SECTOR' >> '$SECTORLOG'"
 as_user "sed -i 's/PlayerLocation=.*/PlayerLocation=$SECTOR/g' $PLAYERFILE/$PLAYER"
 }
@@ -1013,9 +1018,6 @@ fi
 }
 
 los_stationspawn() {
-#ENTITY_SPACESTATION_Station_Piratestation
-#ENTITY_SPACESTATION_Station_Tradestation
-#ENTITY_SPACESTATION_Station_Derelict
 TMP="$@"
 TMP=${TMP/\[BLUEPRINT\] UID: ENTITY_SPACESTATION_}
 FIRST=${TMP//_*}
