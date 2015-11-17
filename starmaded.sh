@@ -1349,6 +1349,19 @@ then
 	if [ -e "${PLAYERFILE}_archive/$1" ]
 	then
 		as_user "mv '${PLAYERFILE}_archive/$1' '$PLAYERFILE/$1'"
+		#Remove players credits from creditloss
+		BALANCE=$(grep "CreditsInBank=" "$PLAYERFILE/$1")
+		BALANCE=${BALANCE/CreditsInBank=}
+		ACL=$(grep "ActualCreditLoss_InactivePlayerBank=" "$CREDITSTATUSFILE")
+		ACL=${ACL/ActualCreditLoss_InactivePlayerBank=}
+		ACL=$(($ACL - $BALANCE))
+		as_user "sed -i 's/ActualCreditLoss_InactivePlayerBank=.*/ActualCreditLoss_InactivePlayerBank=$ACL/g' '$CREDITSTATUSFILE'"
+		BALANCE=$(grep "CurrentCredits=" "$PLAYERFILE/$1")
+		BALANCE=${BALANCE/CurrentCredits=}
+		ACL=$(grep "ActualCreditLoss_InactivePlayerCredits=" "$CREDITSTATUSFILE")
+		ACL=${ACL/ActualCreditLoss_InactivePlayerCredits=}
+		ACL=$(($ACL - $BALANCE))
+		as_user "sed -i 's/ActualCreditLoss_InactivePlayerCredits=.*/ActualCreditLoss_InactivePlayerCredits=$ACL/g' '$CREDITSTATUSFILE'"
 		return
 	fi
 #	echo "File not found"
@@ -1378,6 +1391,7 @@ if [[ ! -f $FACTIONFILE/$1 ]] && [ "$1" != "None" ]
 then
 #	echo "File not found"
 	write_factionfile $1
+	as_user "screen -p 0 -S $SCREENID -X stuff $'/faction_point_set $1 1200\n'"
 	update_faction_info $1
 fi
 }
@@ -1503,6 +1517,12 @@ do
 			echo "Faction $FID File is broken"
 			if [ -z "$(grep "Faction $FID" "$STARTERPATH/logs/check_factions")" ]
 			then
+				BALANCE=$(grep "CreditsInBank=" "$i")
+				BALANCE=${BALANCE/CreditsInBank=}
+				ACL=$(grep "ActualCreditLoss_InactiveFaction=" "$CREDITSTATUSFILE")
+				ACL=${ACL/ActualCreditLoss_InactiveFaction=}
+				ACL=$(($ACL + $BALANCE))
+				as_user "sed -i 's/ActualCreditLoss_InactiveFaction=.*/ActualCreditLoss_InactiveFaction=$ACL/g' '$CREDITSTATUSFILE'"
 				as_user "echo 'Check Faction $FID' >> '$STARTERPATH/logs/check_factions'"
 				as_user "mv '$FACTIONFILE/$FID' '${FACTIONFILE}_archive/$FID'"
 			fi
@@ -1534,8 +1554,6 @@ then
 	as_user "screen -p 0 -S $SCREENID -X stuff $'/faction_point_get $1\n'"
 	sleep 1
 fi
-#[SERVER-LOCAL-ADMIN] [ADMIN COMMAND] [SUCCESS] faction points of Knack test now: -52660.0
-#[ADMIN COMMAND] FACTION_POINT_GET from org.schema.schine.network.server.AdminLocalClient@7a886c25 params: [10002]
 FNAME=""
 FPOINTS=""
 FACTIONINFO=$(tac /dev/shm/output.log | grep "\[ADMIN COMMAND\] FACTION_POINT".*"\[$1" -m 1 -B 1)
@@ -1568,24 +1586,6 @@ as_user "sed -i 's/ActualCreditLoss_Sum=.*/ActualCreditLoss_Sum=$ActualCreditLos
 as_user "sed -i 's/ActualCreditGain_Sum=.*/ActualCreditGain_Sum=$ActualCreditGain_Sum/g' '$CREDITSTATUSFILE'"
 # === Actual Credit difference ===
 #ActualCreditDifference_Inventory=0
-# === Total Credit gain ===
-#TotalCreditLoss_Sum=0
-#TotalCreditLoss_Station=0
-#TotalCreditLoss_InactiveFaction=0
-#TotalCreditLoss_WeaponMeta=0
-#TotalCreditLoss_BankDepositFee=0
-#TotalCreditLoss_InactivePlayerBank=0
-#TotalCreditLoss_InactivePlayerCredits=0
-#TotalCreditLoss_TitanInterest=0
-#TotalCreditLoss_Other=0
-# === Total Credit loss ===
-#TotalCreditGain_Sum=0
-#TotalCreditGain_NewPlayers=0
-#TotalCreditGain_Beacons=0
-#TotalCreditGain_Checkpoints=0
-#TotalCreditGain_Other=0
-# === Total Credit difference ===
-#TotalCreditDifference_Inventory=0
 update_credit_statistic
 }
 
@@ -1593,7 +1593,7 @@ update_credit_statistic() {
 CURRENTTIME=$(date +%s)
 LASTACTIVITY=$(tac "$CREDITSTATISTICFILE" 2> /dev/null | grep "Timestamp=" -m 1)
 LASTACTIVITY=${LASTACTIVITY/Timestamp=}
-if [ ! -e "$CREDITSTATISTICFILE" ] || [ $(($CURRENTTIME - $LASTACTIVITY)) -gt 79200 ]
+if [ ! -e "$CREDITSTATISTICFILE" ] || [ $(($CURRENTTIME - $LASTACTIVITY)) -gt 82800 ]
 then
 	echo "Updating Creditstatistic"
 	#Set no player, so that pl_bounty_calc_bounty gives back total bounty
@@ -1607,19 +1607,81 @@ then
 	CREDITLOSS=${CREDITLOSS/ActualCreditLoss_Sum=}
 	CREDITSGAIN=$(grep "ActualCreditGain_Sum=" "$CREDITSTATUSFILE")
 	CREDITSGAIN=${CREDITSGAIN/ActualCreditGain_Sum=}
-	USEABLESUMMARY=$(($PLAYERBOUNTY + $FACTIONBOUNTY + $CREDITSINFACTIONBANKS + $CREDITSINPLAYERBANKS + $CREDITSOFPLAYERS))
-	TOTALSUMMARY=$(($USEABLESUMMARY + $CREDITSGAIN + $TRADINGCREDITS - $CREDITLOSS))
+	USEABLESUMMARY=$(($CREDITSINFACTIONBANKS + $CREDITSINPLAYERBANKS + $CREDITSOFPLAYERS))
+	TOTALSUMMARY=$(($PLAYERBOUNTY + $FACTIONBOUNTY + $USEABLESUMMARY + $TRADINGCREDITS))
+	ActualCreditDifference_Inventory=$(($ActualCreditDifference_Inventory - $ActualCreditLoss_Station - $ActualCreditLoss_WeaponMeta))
 	as_user "echo 'Timestamp=$CURRENTTIME' >> '$CREDITSTATISTICFILE'"
 	as_user "echo 'TotalSummary=$TOTALSUMMARY' >> '$CREDITSTATISTICFILE'"
 	as_user "echo 'UseableSummary=$USEABLESUMMARY' >> '$CREDITSTATISTICFILE'"
 	as_user "echo 'InTradingGuildBank=$TRADINGCREDITS' >> '$CREDITSTATISTICFILE'"
 	as_user "echo 'CreditLoss=$CREDITLOSS' >> '$CREDITSTATISTICFILE'"
 	as_user "echo 'CreditGain=$CREDITSGAIN' >> '$CREDITSTATISTICFILE'"
+	as_user "echo 'CreditDifference=$ActualCreditDifference_Inventory' >> '$CREDITSTATISTICFILE'"
 	as_user "echo 'InPlayerBounty=$PLAYERBOUNTY' >> '$CREDITSTATISTICFILE'"
 	as_user "echo 'InFactionBounty=$FACTIONBOUNTY' >> '$CREDITSTATISTICFILE'"
 	as_user "echo 'InPlayerBank=$CREDITSINPLAYERBANKS' >> '$CREDITSTATISTICFILE'"
 	as_user "echo 'InFactionBank=$CREDITSINFACTIONBANKS' >> '$CREDITSTATISTICFILE'"
 	as_user "echo 'InPlayerInventory=$CREDITSOFPLAYERS' >> '$CREDITSTATISTICFILE'"
+
+	CreditsInBank=$(($CreditsInBank + $ActualCreditLoss_Sum - $ActualCreditGain_Sum))
+	#Move Actual values to Total values
+	# === Total Credit gain ===
+	TotalCreditLoss_Sum=$(($TotalCreditLoss_Sum + $ActualCreditLoss_Sum))
+	TotalCreditLoss_Station=$(($TotalCreditLoss_Station + $ActualCreditLoss_Station))
+	TotalCreditLoss_InactiveFaction=$(($TotalCreditLoss_InactiveFaction + $ActualCreditLoss_InactiveFaction))
+	TotalCreditLoss_WeaponMeta=$(($TotalCreditLoss_WeaponMeta + $ActualCreditLoss_WeaponMeta))
+	TotalCreditLoss_BankDepositFee=$(($TotalCreditLoss_BankDepositFee + $ActualCreditLoss_BankDepositFee))
+	TotalCreditLoss_InactivePlayerBank=$(($TotalCreditLoss_InactivePlayerBank + $ActualCreditLoss_InactivePlayerBank))
+	TotalCreditLoss_InactivePlayerCredits=$(($TotalCreditLoss_InactivePlayerCredits + $ActualCreditLoss_InactivePlayerCredits))
+	TotalCreditLoss_TitanInterest=$(($TotalCreditLoss_TitanInterest + $ActualCreditLoss_TitanInterest))
+	TotalCreditLoss_Other=$(($TotalCreditLoss_Other + $ActualCreditLoss_Other))
+	# === Total Credit loss ===
+	TotalCreditGain_Sum=$(($TotalCreditGain_Sum + $ActualCreditGain_Sum))
+	TotalCreditGain_NewPlayers=$(($TotalCreditGain_NewPlayers + $ActualCreditGain_NewPlayers))
+	TotalCreditGain_Beacons=$(($TotalCreditGain_Beacons + $ActualCreditGain_Beacons))
+	TotalCreditGain_Checkpoints=$(($TotalCreditGain_Checkpoints + $ActualCreditGain_Checkpoints))
+	TotalCreditGain_Other=$(($TotalCreditGain_Other + $ActualCreditGain_Other))
+	# === Total Credit difference ===
+	TotalCreditDifference_Inventory=$(($TotalCreditDifference_Inventory + $ActualCreditDifference_Inventory))
+	as_user "echo '# ===Creditstatusfile===
+# === Credits avlaibale to refill into the game ===
+CreditsInBank=$CreditsInBank
+# === Actual Credit loss ===
+ActualCreditLoss_Sum=0
+ActualCreditLoss_Station=0
+ActualCreditLoss_InactiveFaction=0
+ActualCreditLoss_WeaponMeta=0
+ActualCreditLoss_BankDepositFee=0
+ActualCreditLoss_InactivePlayerBank=0
+ActualCreditLoss_InactivePlayerCredits=0
+ActualCreditLoss_TitanInterest=0
+ActualCreditLoss_Other=0
+# === Actual Credit gain ===
+ActualCreditGain_Sum=0
+ActualCreditGain_NewPlayers=0
+ActualCreditGain_Beacons=0
+ActualCreditGain_Checkpoints=0
+ActualCreditGain_Other=0
+# === Actual Credit difference ===
+ActualCreditDifference_Inventory=0
+# === Total Credit gain ===
+TotalCreditLoss_Sum=$TotalCreditLoss_Sum
+TotalCreditLoss_Station=$TotalCreditLoss_Station
+TotalCreditLoss_InactiveFaction=$TotalCreditLoss_InactiveFaction
+TotalCreditLoss_WeaponMeta=$TotalCreditLoss_WeaponMeta
+TotalCreditLoss_BankDepositFee=$TotalCreditLoss_BankDepositFee
+TotalCreditLoss_InactivePlayerBank=$TotalCreditLoss_InactivePlayerBank
+TotalCreditLoss_InactivePlayerCredits=$TotalCreditLoss_InactivePlayerCredits
+TotalCreditLoss_TitanInterest=$TotalCreditLoss_TitanInterest
+TotalCreditLoss_Other=$TotalCreditLoss_Other
+# === Total Credit loss ===
+TotalCreditGain_Sum=$TotalCreditGain_Sum
+TotalCreditGain_NewPlayers=$TotalCreditGain_NewPlayers
+TotalCreditGain_Beacons=$TotalCreditGain_Beacons
+TotalCreditGain_Checkpoints=$TotalCreditGain_Checkpoints
+TotalCreditGain_Other=$TotalCreditGain_Other
+# === Total Credit difference ===
+TotalCreditDifference_Inventory=$TotalCreditDifference_Inventory' > '$CREDITSTATUSFILE'"
 fi
 }
 
@@ -1743,6 +1805,19 @@ for PLAYER in ${INACTIVEPLAYERS[@]}; do
 	PLAYER=${PLAYER/:PlayerLastUpdate=*}
 	PLAYER=${PLAYER//*\/}
 	echo "$PLAYER is inactive, move to archive"
+	#Add players credits from creditloss
+	BALANCE=$(grep "CreditsInBank=" "$PLAYERFILE/$PLAYER")
+	BALANCE=${BALANCE/CreditsInBank=}
+	ACL=$(grep "ActualCreditLoss_InactivePlayerBank=" "$CREDITSTATUSFILE")
+	ACL=${ACL/ActualCreditLoss_InactivePlayerBank=}
+	ACL=$(($ACL + $BALANCE))
+	as_user "sed -i 's/ActualCreditLoss_InactivePlayerBank=.*/ActualCreditLoss_InactivePlayerBank=$ACL/g' '$CREDITSTATUSFILE'"
+	BALANCE=$(grep "CurrentCredits=" "$PLAYERFILE/$PLAYER")
+	BALANCE=${BALANCE/CurrentCredits=}
+	ACL=$(grep "ActualCreditLoss_InactivePlayerCredits=" "$CREDITSTATUSFILE")
+	ACL=${ACL/ActualCreditLoss_InactivePlayerCredits=}
+	ACL=$(($ACL + $BALANCE))
+	as_user "sed -i 's/ActualCreditLoss_InactivePlayerCredits=.*/ActualCreditLoss_InactivePlayerCredits=$ACL/g' '$CREDITSTATUSFILE'"
 	as_user "mv '$PLAYERFILE/$PLAYER' '${PLAYERFILE}_archive/$PLAYER'"
 done
 }
@@ -1750,7 +1825,7 @@ done
 check_all() {
 check_factions
 check_players
-check_credits
+#check_credits
 }
 
 #---------------------------Chat Commands---------------------------------------------
@@ -2538,6 +2613,7 @@ case "$1" in
 #		pl_bounty_list_all
 		collect_player_infos
 		collect_faction_infos
+		check_credits
 	;;
 	debug)
 		echo ${@:2}

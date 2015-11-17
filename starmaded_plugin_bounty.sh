@@ -228,6 +228,13 @@ then
 	CURCREDITS=$(($CURCREDITS - $DROPEDCREDITS))
 	as_user "screen -p 0 -S $SCREENID -X stuff $'/give_credits $KILLEDPLAYER -$DROPEDCREDITS\n'"
 	as_user "sed -i 's/CurrentCredits=.*/CurrentCredits=$CURCREDITS/g' '$PLAYERFILE/$KILLEDPLAYER'"
+
+	BANKTAX=$(( $DROPEDCREDITS * $DEPOSITBANKFEE / 100 ))
+	DROPEDCREDITS=$(($DROPEDCREDITS - $BANKTAX))
+	CREDITLOSS=$(grep ActualCreditLoss_BankDepositFee= $CREDITSTATUSFILE)
+	CREDITLOSS=${CREDITLOSS//*=}
+	CREDITLOSS=$(($CREDITLOSS + $BANKTAX))
+	as_user "sed -i 's/ActualCreditLoss_BankDepositFee=.*/ActualCreditLoss_BankDepositFee=$CREDITLOSS/g' $CREDITSTATUSFILE"
 fi
 }
 
