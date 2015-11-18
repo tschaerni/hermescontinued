@@ -99,6 +99,7 @@ SOURCETYP=${TMPSTR//\[*}
 KILLERNAME=${TMPSTR//]*}
 KILLERNAME=${KILLERNAME//*\[}
 KILLERFACTION=0
+TIMESTAMP=$(date +%s)
 case "$SOURCETYP" in
 	*"Ship"*)
 		echo "$KILLEDPLAYER of faction $KILLEDFACTION got killed by a $SOURCETYP named $KILLERNAME"
@@ -122,13 +123,13 @@ case "$SOURCETYP" in
 	*"PlayerCharacter"*)
 		KILLERNAME=${KILLERNAME//*ENTITY_PLAYERCHARACTER_}
 		KILLERNAME=${KILLERNAME//)*}
-		echo "$KILLEDPLAYER of faction $KILLEDFACTION got killed by a $SOURCETYP named $KILLERNAME"
+		echo "time=$TIMESTAMP $KILLEDPLAYER of faction $KILLEDFACTION got killed by a $SOURCETYP named $KILLERNAME"
 		pl_bounty_kill_direct
 		;;
 	*"PlS"*)
 		KILLERNAME=${TMPSTR//PlS[}
 		KILLERNAME=${KILLERNAME// *}
-		echo "$KILLEDPLAYER of faction $KILLEDFACTION got killed by a $SOURCETYP named $KILLERNAME"
+		echo "time=$TIMESTAMP $KILLEDPLAYER of faction $KILLEDFACTION got killed by a $SOURCETYP named $KILLERNAME"
 		if [ "$KILLEDPLAYER" != "$KILLERNAME" ]
 		then
 			echo "Got non sucide from a PlS"
@@ -136,12 +137,13 @@ case "$SOURCETYP" in
 		fi
 		;;
 	*"HeatMissile"*)
-		echo "$KILLEDPLAYER of faction $KILLEDFACTION got killed by a $SOURCETYP named $KILLERNAME"
+		echo "time=$TIMESTAMP $KILLEDPLAYER of faction $KILLEDFACTION got killed by a $SOURCETYP named $KILLERNAME"
 		;;
 	*)
-		echo "$KILLEDPLAYER of faction $KILLEDFACTION got killed by a $SOURCETYP named $KILLERNAME"
+		echo "time=$TIMESTAMP $KILLEDPLAYER of faction $KILLEDFACTION got killed by a $SOURCETYP named $KILLERNAME"
 		;;
 esac
+as_user "echo 'time=$TIMESTAMP $KILLEDPLAYER of faction $KILLEDFACTION got killed by a $SOURCETYP named $KILLERNAME' >> $KILLLOG"
 KILLS=$(grep "PlayerDeaths=" "$PLAYERFILE/$KILLEDPLAYER")
 KILLS=${KILLS/*=}
 ((KILLS++))

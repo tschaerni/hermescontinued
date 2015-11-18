@@ -1212,6 +1212,7 @@ PLANETGRAVLOG=$STARTERPATH/logs/planetgravity.log #Contains all ships that enter
 LOGPLAYERCREDIT=$STARTERPATH/logs/playercredit.log #Contains credits and bankbalance on every login
 STATIONLOG=$STARTERPATH/logs/station.log #Contains all stations
 SECTORLOG=$STARTERPATH/logs/sector.log #Contains all sector changes
+KILLLOG=$STARTERPATH/logs/kill.log #Contains all kills
 #------------------------Game settings----------------------------------------------------------------------------
 VOTECHECKDELAY=10 #The time in seconds between each check of starmade-servers.org
 CREDITSPERVOTE=1000000 # The number of credits a player gets per voting point.
@@ -1691,41 +1692,54 @@ CREDITSINFACTIONBANKS=0
 FACTIONBANKBALANCE=($(grep "CreditsInBank=" "$FACTIONFILE"/1*))
 for line in ${FACTIONBANKBALANCE[@]}; do
 	credits=${line//*=}
-	if [ $credits -gt 40000000 ]
+	name=${line/:CreditsInBank=*}
+	name=${name//*\/}
+	if [ $name -gt 10001 ]
 	then
-		name=${line/:CreditsInBank=*}
-		name=${name//*\/}
-		echo "Faction $name has $credits in bank"
+		if [ $credits -gt 40000000 ]
+		then
+			echo "Faction $name has $credits in bank"
+		fi
+		CREDITSINFACTIONBANKS=$(($CREDITSINFACTIONBANKS + $credits))
 	fi
-	CREDITSINFACTIONBANKS=$(($CREDITSINFACTIONBANKS + $credits))
 done
 }
 
 collect_player_credits() {
+ADMINS=($(grep "Rank=Captain" "$PLAYERFILE"/*))
+ADMINS=${ADMINS[@]}
+ADMINS=${ADMINS//:Rank=Captain}
+ADMINS=${ADMINS//*\/}
 CREDITSINPLAYERBANKS=0
 PLAYERBANKBALANCE=($(grep "CreditsInBank=" "$PLAYERFILE"/*))
 for line in ${PLAYERBANKBALANCE[@]}; do
 	credits=${line//*=}
-	if [ $credits -gt 20000000 ]
+	name=${line/:CreditsInBank=*}
+	name=${name//*\/}
+	if [[ ! " $ADMINS " =~ " $name " ]]
 	then
-		name=${line/:CreditsInBank=*}
-		name=${name//*\/}
-		echo "$name has $credits in bank"
+		if [ $credits -gt 20000000 ]
+		then
+			echo "$name has $credits in bank"
+		fi
+		CREDITSINPLAYERBANKS=$(($CREDITSINPLAYERBANKS + $credits))
 	fi
-	CREDITSINPLAYERBANKS=$(($CREDITSINPLAYERBANKS + $credits))
 done
 
 CREDITSOFPLAYERS=0
 PLAYERINVBALANCE=($(grep "CurrentCredits=" "$PLAYERFILE"/*))
 for line in ${PLAYERINVBALANCE[@]}; do
 	credits=${line//*=}
-	if [ $credits -gt 5000000 ]
+	name=${line/:CurrentCredits=*}
+	name=${name//*\/}
+	if [[ ! " $ADMINS " =~ " $name " ]]
 	then
-		name=${line/:CurrentCredits=*}
-		name=${name//*\/}
-		echo "$name has $credits"
+		if [ $credits -gt 5000000 ]
+		then
+			echo "$name has $credits"
+		fi
+		CREDITSOFPLAYERS=$((CREDITSOFPLAYERS + $credits))
 	fi
-	CREDITSOFPLAYERS=$((CREDITSOFPLAYERS + $credits))
 done
 }
 
@@ -1931,7 +1945,9 @@ function COMMAND_WITHDRAW(){
 #			echo "bank balance is $BALANCECREDITS"
 			if [ "$2" -le "$BALANCECREDITS" ]
 			then
-				log_playerinfo $1
+				#log_playerinfo $1
+				PCREDITS=$(grep CurrentCredits= $PLAYERFILE/$1)
+				PCREDITS=${PCREDITS/CurrentCredits=}
 				NEWBALANCE=$(( $BALANCECREDITS - $2 ))
 				NEWCREDITS=$(($PCREDITS + $2))
 #				echo "new balance for bank account is $NEWBALANCE"
