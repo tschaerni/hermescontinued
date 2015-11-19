@@ -1086,7 +1086,8 @@ log_olddocking() {
 SHIP="$@"
 SHIP=${SHIP/*Ship\[}
 SHIP=${SHIP/\]*}
-as_user "screen -p 0 -S $SCREENID -X stuff $'/destroy_uid_docked ENTITY_SHIP_$SHIP\n'"
+sleep 1
+as_user "screen -p 0 -S $SCREENID -X stuff $'/destroy_uid_docked \"ENTITY_SHIP_$SHIP\"\n'"
 TIMESTAMP=$(date +%s)
 as_user "echo 'time=$TIMESTAMP destroying old docking ship=$SHIP'>> '$SHIPYARDLOG'"
 }
