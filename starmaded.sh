@@ -503,6 +503,7 @@ as_user "echo 'Server started at $DATESTR' >> $LOGPLAYERCREDIT"
 		SEARCHSTATIONBLUEPRINT="[BLUEPRINT] UID: ENTITY_SPACESTATION"
 		SEARCHADDCONTROLLER="[CONTROLLER][ADD-UNIT]"
 		SEARCHSHIPYARDSPAWN="[SERVER] CONSTRUCTION FINISHED: SPAWNING:"
+		SEARCHOLDDOCKING="[DOCKING] docking failed (docking not executed):"
 # Linenumber is set to zero and the a while loop runs through every present array in Linestring
 		LINENUMBER=0
 		while [ -n "${LINESTRING[$LINENUMBER]+set}" ]
@@ -556,6 +557,9 @@ as_user "echo 'Server started at $DATESTR' >> $LOGPLAYERCREDIT"
 				;;
 			*"$SEARCHSHIPYARDSPAWN"*)
 				log_shipyardspawn $CURRENTSTRING &
+				;;
+			*"$SEARCHOLDDOCKING"*)
+				log_olddocking $CURRENTSTRING &
 				;;
 			*"$SEARCHFACTIONTURN"*)
 				check_all &
@@ -1018,7 +1022,7 @@ if [ "$SOURCE" == "Ship" ]
 then
 	SHIP=${TMP//\]*}
 	SHIP=${SHIP/Ship\[}
-	PLANET=${TMP/*GRAV\[ENTITY_PLANET}
+	PLANET=${TMP/*GRAV\[ENTITY_PLANET_}
 	PLANET=${PLANET//(*}
 	TIMESTAMP=$(date +%s)
 	as_user "echo 'time=$TIMESTAMP ship=$SHIP planet=$PLANET' >> '$PLANETGRAVLOG'"
@@ -1068,7 +1072,7 @@ fi
 as_user "sed -i 's/PlayerControllingType=.*/PlayerControllingType=$SOURCE/g' '$PLAYERFILE/$PLAYER'"
 as_user "sed -i 's/PlayerControllingObject=.*/PlayerControllingObject=$CONTROLLED/g' '$PLAYERFILE/$PLAYER'"
 TIMESTAMP=$(date +%s)
-as_user "echo 'time=$TIMESTAMP player=$PLAYER object=$CONTROLLING' >> '$CONTROLLERLOG'"
+as_user "echo 'time=$TIMESTAMP player=$PLAYER object=$CONTROLLED' >> '$CONTROLLERLOG'"
 }
 
 log_shipyardspawn() {
@@ -1078,6 +1082,14 @@ TIMESTAMP=$(date +%s)
 as_user "echo 'time=$TIMESTAMP ship=$SHIP mass=0 fid=0 sector=0,0,0'>> '$SHIPYARDLOG'"
 }
 
+log_olddocking() {
+SHIP="$@"
+SHIP=${SHIP/*Ship\[}
+SHIP=${SHIP/\]*}
+as_user "screen -p 0 -S $SCREENID -X stuff $'/destroy_uid_docked ENTITY_SHIP_$SHIP\n'"
+TIMESTAMP=$(date +%s)
+as_user "echo 'time=$TIMESTAMP destroying old docking ship=$SHIP'>> '$SHIPYARDLOG'"
+}
 #------------------------------Game mechanics-----------------------------------------
 
 universeboarder() {
