@@ -356,6 +356,8 @@ then
 					echo "Beacon says: \"Give me silver!\""
 					as_user "screen -p 0 -S $SCREENID -X stuff $'/give $PLAYER \"Silver Bar\" $BEACONSILVER\n'"
 					as_user "screen -p 0 -S $SCREENID -X stuff $'/pm $PLAYER \"You just got $BEACONSILVER silver bars!\"\n'"
+					TIMESTAMP=$(date +%s)
+					as_user "echo 'time=$TIMESTAMP player=$1 amount=$BEACONSILVER type=BEACON' >> '$SILVEREXCHANGELOG'"
 					;;
 				*"Faction"*)
 					echo "Beacon says: \"Give my faction FPs!\""
@@ -568,6 +570,8 @@ function COMMAND_FW_EXCHANGE(){
 				as_user "sed -i 's/currentwp=$old_wpoints/currentwp=$new_wpoints/g' $FWFACTIONFILEPFX$FACTIONID.txt"
 				as_user "screen -p 0 -S $SCREENID -X stuff $'/give $1 silver $(($WPEXCHANGERATESILVER * $3))\n'"
 				as_user "screen -p 0 -S $SCREENID -X stuff $'/pm $1 Exchanged $wptosub WP into $(($WPEXCHANGERATESILVER * $3)) silver\n'"
+				TIMESTAMP=$(date +%s)
+				as_user "echo 'time=$TIMESTAMP player=$1 amount=$(($WPEXCHANGERATESILVER * $3)) type=WP' >> '$SILVEREXCHANGELOG'"
 			else if [ $2 = "credits" ] && [ $WPEXCHANGERATECREDITS -gt 0 ]
 			then
 				as_user "sed -i 's/currentwp=$old_wpoints/currentwp=$new_wpoints/g' $FWFACTIONFILEPFX$FACTIONID.txt"

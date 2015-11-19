@@ -501,6 +501,8 @@ as_user "echo 'Server started at $DATESTR' >> $LOGPLAYERCREDIT"
 		SEARCHPLANETGRAVITY="GRAVITY UPDATE:::::: GRAV[ENTITY_PLANET"
 		SEARCHSTATIONSPAWN="HANDLING Entity REQUEST: PE"
 		SEARCHSTATIONBLUEPRINT="[BLUEPRINT] UID: ENTITY_SPACESTATION"
+		SEARCHADDCONTROLLER="[CONTROLLER][ADD-UNIT]"
+		SEARCHSHIPYARDSPAWN="[SERVER] CONSTRUCTION FINISHED: SPAWNING:"
 # Linenumber is set to zero and the a while loop runs through every present array in Linestring
 		LINENUMBER=0
 		while [ -n "${LINESTRING[$LINENUMBER]+set}" ]
@@ -547,7 +549,13 @@ as_user "echo 'Server started at $DATESTR' >> $LOGPLAYERCREDIT"
 			*"$SEARCHSTATIONSPAWN"*)
 				;&
 			*"$SEARCHSTATIONBLUEPRINT"*)
-				los_stationspawn $CURRENTSTRING &
+				log_stationspawn $CURRENTSTRING &
+				;;
+			*"$SEARCHADDCONTROLLER"*)
+				log_addcontroller $CURRENTSTRING &
+				;;
+			*"$SEARCHSHIPYARDSPAWN"*)
+				log_shipyardspawn $CURRENTSTRING &
 				;;
 			*"$SEARCHFACTIONTURN"*)
 				check_all &
@@ -771,8 +779,8 @@ then
 	as_user "sed -i 's/CurrentCredits=.*/CurrentCredits=$PCREDITS/g' $PLAYERFILE/$1"
 	as_user "sed -i 's/PlayerFaction=.*/PlayerFaction=$PFACTION/g' $PLAYERFILE/$1"
 	as_user "sed -i 's/PlayerLocation=.*/PlayerLocation=$PSECTOR/g' $PLAYERFILE/$1"
-	as_user "sed -i 's/PlayerControllingType=.*/PlayerControllingType=$PCONTROLTYPE/g' $PLAYERFILE/$1"
-	as_user "sed -i 's/PlayerControllingObject=.*/PlayerControllingObject=$PCONTROLOBJECT/g' $PLAYERFILE/$1"
+#	as_user "sed -i 's/PlayerControllingType=.*/PlayerControllingType=$PCONTROLTYPE/g' $PLAYERFILE/$1"
+#	as_user "sed -i 's/PlayerControllingObject=.*/PlayerControllingObject=$PCONTROLOBJECT/g' $PLAYERFILE/$1"
 	as_user "sed -i 's/PlayerLastUpdate=.*/PlayerLastUpdate=$PLASTUPDATE/g' $PLAYERFILE/$1"
 	as_user "sed -i 's/PlayerLoggedIn=.*/PlayerLoggedIn=Yes/g' $PLAYERFILE/$1"
 	if [ "$PFACTION" != "None" ]
@@ -1010,14 +1018,14 @@ if [ "$SOURCE" == "Ship" ]
 then
 	SHIP=${TMP//\]*}
 	SHIP=${SHIP/Ship\[}
-	PLANET=${TMP/*GRAV\[}
+	PLANET=${TMP/*GRAV\[ENTITY_PLANET}
 	PLANET=${PLANET//(*}
-	TIMESTAMP=$(date '+%b_%d_%Y_%H.%M.%S')
-	as_user "echo '$TIMESTAMP Ship $SHIP entered gravity of planet $PLANET' >> '$PLANETGRAVLOG'"
+	TIMESTAMP=$(date +%s)
+	as_user "echo 'time=$TIMESTAMP ship=$SHIP planet=$PLANET' >> '$PLANETGRAVLOG'"
 fi
 }
 
-los_stationspawn() {
+log_stationspawn() {
 TMP="$@"
 TMP=${TMP/\[BLUEPRINT\] UID: ENTITY_SPACESTATION_}
 FIRST=${TMP//_*}
@@ -1035,6 +1043,39 @@ CREDITLOSS=$(grep "ActualCreditLoss_Station=" "$CREDITSTATUSFILE")
 CREDITLOSS=$(($CREDITLOSS + 1000000))
 as_user "sed -i 's/ActualCreditLoss_Station=.*/ActualCreditLoss_Station=$CREDITLOSS/g' '$CREDITSTATUSFILE'"
 echo "Detected Stationspawn"
+}
+
+log_addcontroller() {
+TMP="$@"
+PLAYER=${TMP/* PlS\[}
+PLAYER=${PLAYER// *}
+TMP=${TMP/*controllers: }
+SOURCE=${TMP/\[*}
+if [ "$SOURCE" == "PlayerCharacter" ]
+then
+	CONTROLLED=${TMP//)*}
+	CONTROLLED=${CONTROLLED/*(}
+else
+	CONTROLLED=${TMP/*\[}
+	CONTROLLED=${CONTROLLED/(*}
+	CONTROLLED=${CONTROLLED/\]*}
+fi
+if [ "$SOURCE" == "Ship" ]
+then
+	CONTROLLED=${CONTROLLED/ENTITY_SHIP_}
+	CONTROLLED=ENTITY_SHIP_$CONTROLLED
+fi
+as_user "sed -i 's/PlayerControllingType=.*/PlayerControllingType=$SOURCE/g' '$PLAYERFILE/$PLAYER'"
+as_user "sed -i 's/PlayerControllingObject=.*/PlayerControllingObject=$CONTROLLED/g' '$PLAYERFILE/$PLAYER'"
+TIMESTAMP=$(date +%s)
+as_user "echo 'time=$TIMESTAMP player=$PLAYER object=$CONTROLLING' >> '$CONTROLLERLOG'"
+}
+
+log_shipyardspawn() {
+SHIP="$@"
+SHIP=${SHIP/*SPAWNING: }
+TIMESTAMP=$(date +%s)
+as_user "echo 'time=$TIMESTAMP ship=$SHIP mass=0 fid=0 sector=0,0,0'>> '$SHIPYARDLOG'"
 }
 
 #------------------------------Game mechanics-----------------------------------------
@@ -1213,6 +1254,9 @@ LOGPLAYERCREDIT=$STARTERPATH/logs/playercredit.log #Contains credits and bankbal
 STATIONLOG=$STARTERPATH/logs/station.log #Contains all stations
 SECTORLOG=$STARTERPATH/logs/sector.log #Contains all sector changes
 KILLLOG=$STARTERPATH/logs/kill.log #Contains all kills
+CONTROLLERLOG=$STARTERPATH/logs/controlling.log #Contains all changes of controlled entities
+SHIPYARDLOG=$STARTERPATH/logs/shipyard.log #Contains all spawns of shipyards
+SILVEREXCHANGELOG=$STARTERPATH/logs/silverexchange.log #Contains all exchanges to silver
 #------------------------Game settings----------------------------------------------------------------------------
 VOTECHECKDELAY=10 #The time in seconds between each check of starmade-servers.org
 CREDITSPERVOTE=1000000 # The number of credits a player gets per voting point.
@@ -1285,6 +1329,7 @@ CREATEFILE="cat > $CREDITSTATUSFILE <<_EOF_
 # ===Creditstatusfile===
 # === Credits avlaibale to refill into the game ===
 CreditsInBank=0
+CreditsRefilled=0
 # === Actual Credit loss ===
 ActualCreditLoss_Sum=0
 ActualCreditLoss_Station=0
@@ -1302,8 +1347,9 @@ ActualCreditGain_Beacons=0
 ActualCreditGain_Checkpoints=0
 ActualCreditGain_Other=0
 # === Actual Credit difference ===
+ActualCreditDifference_Sum=0
 ActualCreditDifference_Inventory=0
-# === Total Credit gain ===
+# === Total Credit loss ===
 TotalCreditLoss_Sum=0
 TotalCreditLoss_Station=0
 TotalCreditLoss_InactiveFaction=0
@@ -1313,13 +1359,15 @@ TotalCreditLoss_InactivePlayerBank=0
 TotalCreditLoss_InactivePlayerCredits=0
 TotalCreditLoss_TitanInterest=0
 TotalCreditLoss_Other=0
-# === Total Credit loss ===
+# === Total Credit gain ===
+TotalCreditRefilled=0
 TotalCreditGain_Sum=0
 TotalCreditGain_NewPlayers=0
 TotalCreditGain_Beacons=0
 TotalCreditGain_Checkpoints=0
 TotalCreditGain_Other=0
 # === Total Credit difference ===
+TotalCreditDifference_Sum=0
 TotalCreditDifference_Inventory=0
 _EOF_"
 as_user "$CREATEFILE"
@@ -1583,6 +1631,8 @@ source $CREDITSTATUSFILE
 ActualCreditLoss_Sum=$(($ActualCreditLoss_Station + $ActualCreditLoss_InactiveFaction + $ActualCreditLoss_WeaponMeta + $ActualCreditLoss_BankDepositFee + $ActualCreditLoss_InactivePlayerBank + $ActualCreditLoss_InactivePlayerCredits + $ActualCreditLoss_TitanInterest + $ActualCreditLoss_Other))
 # === Actual Credit gain ===
 ActualCreditGain_Sum=$(($ActualCreditGain_NewPlayers + $ActualCreditGain_Beacons + $ActualCreditGain_Checkpoints + $ActualCreditGain_Other))
+# === Actual Credit difference
+ActualCreditDifference_Sum=$(($ActualCreditGain_Sum - $ActualCreditLoss_Sum + $ActualCreditDifference_Inventory))
 as_user "sed -i 's/ActualCreditLoss_Sum=.*/ActualCreditLoss_Sum=$ActualCreditLoss_Sum/g' '$CREDITSTATUSFILE'"
 as_user "sed -i 's/ActualCreditGain_Sum=.*/ActualCreditGain_Sum=$ActualCreditGain_Sum/g' '$CREDITSTATUSFILE'"
 # === Actual Credit difference ===
@@ -1617,16 +1667,18 @@ then
 	as_user "echo 'InTradingGuildBank=$TRADINGCREDITS' >> '$CREDITSTATISTICFILE'"
 	as_user "echo 'CreditLoss=$CREDITLOSS' >> '$CREDITSTATISTICFILE'"
 	as_user "echo 'CreditGain=$CREDITSGAIN' >> '$CREDITSTATISTICFILE'"
-	as_user "echo 'CreditDifference=$ActualCreditDifference_Inventory' >> '$CREDITSTATISTICFILE'"
+	as_user "echo 'CreditRefilled=$ActualCreditsRefilled' >> '$CREDITSTATISTICFILE'"
+	as_user "echo 'CreditDifferenceSum=$ActualCreditDifference_Sum' >> '$CREDITSTATISTICFILE'"
+	as_user "echo 'CreditDifferenceInv=$ActualCreditDifference_Inventory' >> '$CREDITSTATISTICFILE'"
 	as_user "echo 'InPlayerBounty=$PLAYERBOUNTY' >> '$CREDITSTATISTICFILE'"
 	as_user "echo 'InFactionBounty=$FACTIONBOUNTY' >> '$CREDITSTATISTICFILE'"
 	as_user "echo 'InPlayerBank=$CREDITSINPLAYERBANKS' >> '$CREDITSTATISTICFILE'"
 	as_user "echo 'InFactionBank=$CREDITSINFACTIONBANKS' >> '$CREDITSTATISTICFILE'"
 	as_user "echo 'InPlayerInventory=$CREDITSOFPLAYERS' >> '$CREDITSTATISTICFILE'"
 
-	CreditsInBank=$(($CreditsInBank + $ActualCreditLoss_Sum - $ActualCreditGain_Sum))
 	#Move Actual values to Total values
 	# === Total Credit gain ===
+	TotalCreditRefilled=$(($TotalCreditRefilled + $ActualCreditsRefilled))
 	TotalCreditLoss_Sum=$(($TotalCreditLoss_Sum + $ActualCreditLoss_Sum))
 	TotalCreditLoss_Station=$(($TotalCreditLoss_Station + $ActualCreditLoss_Station))
 	TotalCreditLoss_InactiveFaction=$(($TotalCreditLoss_InactiveFaction + $ActualCreditLoss_InactiveFaction))
@@ -1643,10 +1695,12 @@ then
 	TotalCreditGain_Checkpoints=$(($TotalCreditGain_Checkpoints + $ActualCreditGain_Checkpoints))
 	TotalCreditGain_Other=$(($TotalCreditGain_Other + $ActualCreditGain_Other))
 	# === Total Credit difference ===
+	TotalCreditDifference_Sum=$(( $TotalCreditDifference_Sum + $ActualCreditDifference_Sum ))
 	TotalCreditDifference_Inventory=$(($TotalCreditDifference_Inventory + $ActualCreditDifference_Inventory))
 	as_user "echo '# ===Creditstatusfile===
 # === Credits avlaibale to refill into the game ===
-CreditsInBank=$CreditsInBank
+CreditsInBank=0
+ActualCreditsRefilled=0
 # === Actual Credit loss ===
 ActualCreditLoss_Sum=0
 ActualCreditLoss_Station=0
@@ -1664,8 +1718,9 @@ ActualCreditGain_Beacons=0
 ActualCreditGain_Checkpoints=0
 ActualCreditGain_Other=0
 # === Actual Credit difference ===
+ActualCreditDifference_Sum=0
 ActualCreditDifference_Inventory=0
-# === Total Credit gain ===
+# === Total Credit loss ===
 TotalCreditLoss_Sum=$TotalCreditLoss_Sum
 TotalCreditLoss_Station=$TotalCreditLoss_Station
 TotalCreditLoss_InactiveFaction=$TotalCreditLoss_InactiveFaction
@@ -1675,13 +1730,15 @@ TotalCreditLoss_InactivePlayerBank=$TotalCreditLoss_InactivePlayerBank
 TotalCreditLoss_InactivePlayerCredits=$TotalCreditLoss_InactivePlayerCredits
 TotalCreditLoss_TitanInterest=$TotalCreditLoss_TitanInterest
 TotalCreditLoss_Other=$TotalCreditLoss_Other
-# === Total Credit loss ===
+# === Total Credit gain ===
+TotalCreditRefilled=$TotalCreditRefilled
 TotalCreditGain_Sum=$TotalCreditGain_Sum
 TotalCreditGain_NewPlayers=$TotalCreditGain_NewPlayers
 TotalCreditGain_Beacons=$TotalCreditGain_Beacons
 TotalCreditGain_Checkpoints=$TotalCreditGain_Checkpoints
 TotalCreditGain_Other=$TotalCreditGain_Other
 # === Total Credit difference ===
+TotalCreditDifference_Sum=$TotalCreditDifference_Sum
 TotalCreditDifference_Inventory=$TotalCreditDifference_Inventory' > '$CREDITSTATUSFILE'"
 fi
 }
@@ -2185,6 +2242,8 @@ else
 			as_user "screen -p 0 -S $SCREENID -X stuff $'/giveid $1 342 $BARS\n'"
 			as_user "sed -i 's/VotingPoints=.*/VotingPoints=$NEWVOTE/g' $PLAYERFILE/$1"
 			as_user "screen -p 0 -S $SCREENID -X stuff $'/pm $1 You traded in $2 voting points for $BARS silverbars. Please check your Inventory to confirm that.\n'"
+			TIMESTAMP=$(date +%s)
+			as_user "echo 'time=$TIMESTAMP player=$1 amount=$BARS type=VOTE' >> '$SILVEREXCHANGELOG'"
 		else
 			as_user "screen -p 0 -S $SCREENID -X stuff $'/pm $1 You dont have enough voting points to do that! You only have $VOTEBALANCE voting points\n'"
 		fi
@@ -2534,6 +2593,28 @@ function COMMAND_THREADDUMP(){
 		PID=$(ps aux | grep -v grep | grep $SERVICE | grep -v tee | grep port:$PORT | awk '{print $2}')
 		as_user "jstack $PID >> $STARTERPATH/logs/threaddump$(date +%H%M%S.%N).log"
 		as_user "screen -p 0 -S $SCREENID -X stuff $'/pm $1 The current java process has been exported to logs/threaddump$(date +%H%M%S.%N).log\n'"
+	fi
+}
+
+function COMMAND_REFILLCREDITS(){
+#A debug tool that outputs what the server is doing to a file
+#USAGE: !THREADDUMP
+	if [ "$#" -ne "2" ]
+	then
+		as_user "screen -p 0 -S $SCREENID -X stuff $'/pm $1 Invalid parameters. Please use !REFILLCREDITS <amount>\n'"
+	else
+		re='^[0-9]+$'
+		if ! [[ $2 =~ $re ]]
+		then
+			as_user "screen -p 0 -S $SCREENID -X stuff $'/pm $1 Invalid parameters. Amount must be a number!\n'"
+			return
+		fi
+		refilled=$(grep ActualCreditsRefilled= "$CREDITSTATUSFILE")
+		refilled=${refilled/ActualCreditsRefilled=}
+		refilled=$(($refilled + $2))
+		as_user "sed -i 's/ActualCreditsRefilled=.*/ActualCreditsRefilled=$refilled/g' '$CREDITSTATUSFILE'"
+		as_user "screen -p 0 -S $SCREENID -X stuff $'/give_credits $1 $2\n'"
+		as_user "screen -p 0 -S $SCREENID -X stuff $'/pm $1 You got $2 credits to refill shop, also set refilled amount for today to $refilled\n'"
 	fi
 }
 
