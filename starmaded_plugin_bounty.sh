@@ -102,29 +102,48 @@ KILLERFACTION=0
 TIMESTAMP=$(date +%s)
 case "$SOURCETYP" in
 	*"Ship"*)
+		KILLERNAME=${KILLERNAME/ENTITY_SHIP_}
+		KILLERNAME="ENTITY_SHIP_$KILLERNAME"
 		echo "$KILLEDPLAYER of faction $KILLEDFACTION got killed by a $SOURCETYP named $KILLERNAME"
-		as_user "screen -p 0 -S $SCREENID -X stuff $'/ship_info_uid \"ENTITY_SHIP_$KILLERNAME\"\n'"
-		sleep 1
+		CONTROLLERS=($(grep "PlayerControllingObject=$KILLERNAME" "$PLAYERFILE"/*))
+		CPLAYER="None"
+		for controller in ${CONTROLLERS[@]} ; do
+			SHIP=${controller/*PlayerControllingObject=}
+			if [ "$SHIP" == "$KILLERNAME" ]
+			then
+				CPLAYER=${controller//:*}
+				CPLAYER=${CPLAYER//*\/}
+				echo "$KILLERNAME is controlled by $CPLAYER"
+				pl_bounty_kill_direct $CPLAYER
+				KILLERNAME="$KILLERNAME controlled by $CPLAYER"
+				break
+			fi
+		done
+		if [ "$CPLAYER" == "None" ]
+		then
+			as_user "screen -p 0 -S $SCREENID -X stuff $'/ship_info_uid \"$KILLERNAME\"\n'"
+			sleep 1
 #[SERVER-LOCAL-ADMIN] DatabaseEntry [uid=ENTITY_SHIP_Station_Piratestation Gamma_8_5_5_144596482932710, sectorPos=(8, 5, 5), type=5, seed=0, lastModifier=, spawner=<system>, realName=Station_Piratestation Gamma_8_5_5_144596482932710, touched=true, faction=-1, pos=(0.0, -28.5, 101.0), minPos=(-1, -1, -1), maxPos=(1, 1, 1), creatorID=0]
 # --------------- If not found serach for something like this -------------
 #[SERVER-LOCAL-ADMIN] UID Not Found in DB: ENTITY_SHIP_NullPointer_1446064354948; checking unsaved objects
 #[SERVER-LOCAL-ADMIN] Attached: [PlS[AceFist [derblauefalke]*; id(321)(3)f(0)]]
-		ENTITYINFO=$(tac /dev/shm/output.log | grep -m 1 "\[SERVER-LOCAL-ADMIN\] DatabaseEntry \[uid=ENTITY_SHIP_$KILLERNAME, ")
-		if [ -n "$ENTITYINFO" ]
-		then
-			KILLERFACTION=${ENTITYINFO//*faction=}
-			KILLERFACTION=${KILLERFACTION//,*}
-			echo "Faction of Killer: $KILLERFACTION"
-			pl_bounty_kill_indirect
-		else
-			echo "Was an unsaved Entity, or we were too fast"
+			ENTITYINFO=$(tac /dev/shm/output.log | grep -m 1 "\[SERVER-LOCAL-ADMIN\] DatabaseEntry \[uid=$KILLERNAME, ")
+			if [ -n "$ENTITYINFO" ]
+			then
+				KILLERFACTION=${ENTITYINFO//*faction=}
+				KILLERFACTION=${KILLERFACTION//,*}
+				echo "Faction of Killer: $KILLERFACTION"
+				pl_bounty_kill_indirect
+			else
+				echo "Was an unsaved Entity, or we were too fast"
+			fi
 		fi
 		;;
 	*"PlayerCharacter"*)
 		KILLERNAME=${KILLERNAME//*ENTITY_PLAYERCHARACTER_}
 		KILLERNAME=${KILLERNAME//)*}
 		echo "time=$TIMESTAMP $KILLEDPLAYER of faction $KILLEDFACTION got killed by a $SOURCETYP named $KILLERNAME"
-		pl_bounty_kill_direct
+		pl_bounty_kill_direct $KILLERNAME
 		;;
 	*"PlS"*)
 		KILLERNAME=${TMPSTR//PlS[}
@@ -133,7 +152,7 @@ case "$SOURCETYP" in
 		if [ "$KILLEDPLAYER" != "$KILLERNAME" ]
 		then
 			echo "Got non sucide from a PlS"
-			pl_bounty_kill_direct
+			pl_bounty_kill_direct $KILLERNAME
 		fi
 		;;
 	*"HeatMissile"*)
@@ -159,9 +178,9 @@ as_user "screen -p 0 -S $SCREENID -X stuff $'/give_laser_weapon $KILLEDPLAYER\n'
 }
 
 pl_bounty_kill_direct() {
-if [ -e "$PLAYERFILE/$KILLERNAME" ]
+if [ -e "$PLAYERFILE/$1" ]
 then
-	KILLERFACTION=$(grep "PlayerFaction=" "$PLAYERFILE/$KILLERNAME")
+	KILLERFACTION=$(grep "PlayerFaction=" "$PLAYERFILE/$1")
 	KILLERFACTION=${KILLERFACTION/*=}
 	KILLERFACTION=${KILLERFACTION// }
 	if [ "$KILLERFACTION" == "None" ] || [ "$KILLERFACTION" != "$KILLEDFACTION" ]
@@ -169,22 +188,29 @@ then
 		pl_bounty_calc_take_bounty
 		pl_bounty_credit_drops
 
-		KILLS=$(grep "PlayerKills=" "$PLAYERFILE/$KILLERNAME")
+		KILLS=$(grep "PlayerKills=" "$PLAYERFILE/$1")
 		KILLS=${KILLS/*=}
 		((KILLS++))
-		as_user "sed -i 's/PlayerKills=.*/PlayerKills=$KILLS/g' '$PLAYERFILE/$KILLERNAME'"
+		as_user "sed -i 's/PlayerKills=.*/PlayerKills=$KILLS/g' '$PLAYERFILE/$1'"
+		if [ "$KILLERFACTION" != "None" ]
+		then
+			KILLS=$(grep "FactionKills=" "$FACTIONFILE/$KILLERFACTION")
+			KILLS=${KILLS/*=}
+			((KILLS++))
+			as_user "sed -i 's/FactionKills=.*/FactionKills=$KILLS/g' '$FACTIONFILE/$KILLERFACTION'"
+		fi
 
 		BOUNTY=$(($PLAYERBOUNTY + $FACTIONBOUNTY))
 		if [ $BOUNTY -le 0 ] && [ $DROPEDCREDITS -le 0 ]
 		then
-			as_user "screen -p 0 -S $SCREENID -X stuff $'/pm $KILLERNAME No bounty was set on ${KILLEDPLAYER}\s head!\n'"
+			as_user "screen -p 0 -S $SCREENID -X stuff $'/pm $1 No bounty was set on ${KILLEDPLAYER}\'s head!\n'"
 			return
 		fi
-		BANKBALANCE=$(grep "CreditsInBank=" "$PLAYERFILE/$KILLERNAME")
+		BANKBALANCE=$(grep "CreditsInBank=" "$PLAYERFILE/$1")
 		BANKBALANCE=${BANKBALANCE/*=}
 		NEW=$(($BANKBALANCE + $BOUNTY + $DROPEDCREDITS))
-		as_user "sed -i 's/CreditsInBank=.*/CreditsInBank=$NEW/g' '$PLAYERFILE/$KILLERNAME'"
-		as_user "screen -p 0 -S $SCREENID -X stuff $'/pm $KILLERNAME You got $BOUNTY Credits from bounty and $DROPEDCREDITS Credits from creditdrop transfered onto your bankaccount for killing ${KILLEDPLAYER}!\n'"
+		as_user "sed -i 's/CreditsInBank=.*/CreditsInBank=$NEW/g' '$PLAYERFILE/$1'"
+		as_user "screen -p 0 -S $SCREENID -X stuff $'/pm $1 You got $BOUNTY Credits from bounty and $DROPEDCREDITS Credits from creditdrop transfered onto your bankaccount for killing ${KILLEDPLAYER}!\n'"
 		pl_bounty_list_all
 	fi
 fi
@@ -204,7 +230,7 @@ then
 		as_user "sed -i 's/FactionKills=.*/FactionKills=$KILLS/g' '$FACTIONFILE/$KILLERFACTION'"
 
 		BOUNTY=$(($PLAYERBOUNTY + $FACTIONBOUNTY))
-		if [ $BOUNTY -le 0 ]
+		if [ $BOUNTY -le 0 ] && [ $DROPEDCREDITS -le 0 ]
 		then
 			return
 		fi
