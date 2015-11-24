@@ -1079,7 +1079,7 @@ log_shipyardspawn() {
 SHIP="$@"
 SHIP=${SHIP/*SPAWNING: }
 TIMESTAMP=$(date +%s)
-as_user "echo 'time=$TIMESTAMP ship=$SHIP mass=0 fid=0 sector=0,0,0'>> '$SHIPYARDLOG'"
+as_user "echo 'time=$TIMESTAMP ship=${SHIP}0 mass=0 fid=0 sector=0,0,0'>> '$SHIPYARDLOG'"
 }
 
 log_olddocking() {
@@ -1779,7 +1779,7 @@ collect_player_credits() {
 ADMINS=($(grep "Rank=Captain" "$PLAYERFILE"/*))
 ADMINS=${ADMINS[@]}
 ADMINS=${ADMINS//:Rank=Captain}
-ADMINS=${ADMINS//*\/}
+ADMINS=${ADMINS//$PLAYERFILE\/}
 CREDITSINPLAYERBANKS=0
 PLAYERBANKBALANCE=($(grep "CreditsInBank=" "$PLAYERFILE"/*))
 for line in ${PLAYERBANKBALANCE[@]}; do

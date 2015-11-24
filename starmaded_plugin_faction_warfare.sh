@@ -260,7 +260,7 @@ then
 	FACTIONID=$(grep "PlayerFaction=" "$PLAYERFILE/$PLAYER")
 	FACTIONID=${FACTIONID/*=}
 	FACTIONID=${FACTIONID// }
-	if [ -z "$FACTIONID" ] || [ $FACTIONID -eq 0 ] || [ "$FACTIONID" == "None" ]
+	if [ -z "$FACTIONID" ] || [ "$FACTIONID" == "None" ] || [ $FACTIONID -eq 0 ]
 	then
 		as_user "screen -p 0 -S $SCREENID -X stuff $'/pm $PLAYER \"Your can\'t activate this beacon, because you are not in a faction!\"\n'"
 		return
@@ -461,6 +461,9 @@ for spawn in $SPAWNLIST; do
 	echo "$BP $ENTITY $POS"
 	as_user "screen -p 0 -S $SCREENID -X stuff $'/spawn_entity $BP $ENTITY $POS -2 false\n'"
 done
+#RNDX=$(( $RANDOM % 129 - 64 ))
+#RNDY=$(( $RANDOM % 129 - 64 ))
+#RNDZ=$(( $RANDOM % 129 - 64 ))
 as_user "sed -i 's/$OLD/$NEW/g' '$FACTIONWARFARECONFIG'"
 }
 
