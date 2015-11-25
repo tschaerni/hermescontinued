@@ -161,12 +161,12 @@ CONFIGCREATE="cat > $FACTIONWARFARECONFIG <<_EOF_
 #  mines gets checked and warpoints get earned
 #  WARFACTIONIDS: The IDs of the attending factions
 #  CHECKPOINTS: IDs of the claimable checkpoints. Example: ( CP_WP_Mine_6_6_6_part1 CP_WP_Mine_6_6_6_part2 CP_WP_Mine_6_6_6_part3 CP_WP_Mine_6_6_6_part4 )
-#  FUNCTIONALBEACONS: IDs of all avaliable beacons. Its function is described by in the name after the prefix. Example: CB_Scanner_001
-#         have to have their name to beginn with sich an ID and end with a WARFACTIONID.
-#         Example: Mine_6_6_6_part1_10001
-#  SPAWNBEACONLISTFILE: The file where all respawning beacons are listed. Make sure to name them like GN_2_2_2_name <GN_ POS _ Name>
+#  FIXEDBEACONSPAWNS: There all respawning beacons are listed. Make sure to name them like GN_2_2_2_name <GN_ POS _ Name>
+#  SPAWNBEACONLISTFILE: File that containes the IDs of all avaliable beacons. Its function is described by the name after the prefix. Example: CB_Scanner_00
 #  SPAWNPOSSIBLEFUNCTIONS: The psooible functions for the random spawn. The more often a function is present in the list, the higher is the possibility to spawn that kind
 #  SPAWNTIMER: Respawntimer for Beacons
+#  RANDOMSPAWNAREA: Beacons spawn random in +-AREA³ 
+#  MAXRANDOMBEACONS: The maximum number of random spawned beacons
 #  WPEXCHANGERATEFP: Exchangerate between WP and FP (0 to deactivate)
 #  WPEXCHANGERATESILVER: Exchangerate between WP and Silver (0 to deactivate)
 #  WPEXCHANGERATECREDITS: Exchangerate between WP and Credits (0 to deactivate)
@@ -175,12 +175,14 @@ FWFACTIONFILEPFX=$FACTIONWARFAREFILES/faction
 FWWARPOINTSPERCPROUND=1
 WARFACTIONIDS=( )
 CHECKPOINTS=( )
-FUNCTIONALBEACONS=( )
+FIXEDBEACONSPAWNS=( )
 DEFAULTBEACONBP=Beacon
 DEFAULTPIRATEBP=Pirate
 SPAWNBEACONLISTFILE=$FACTIONWARFAREFILES/beaconspawns.txt
 SPAWNPOSSIBLEFUNCTIONS=( None )
 SPAWNTIMER=1800
+RANDOMSPAWNAREA=64
+MAXRANDOMBEACONS=100
 WPEXCHANGERATEFP=50
 WPEXCHANGERATESILVER=2
 WPEXCHANGERATECREDITS=0
@@ -319,9 +321,10 @@ then
 
 #delete beacon from list and delete entity. Do this before any other action to reduce the possibility of abuse. (F.e. use by two players simultaneously)
 			as_user "screen -p 0 -S $SCREENID -X stuff $'/destroy_uid ENTITY_SHIP_$SOURCE\n'"
-			OLD="$(grep "FUNCTIONALBEACONS=" "$FACTIONWARFARECONFIG")"
-			NEW="${OLD/ $SOURCE / }"
-			as_user "sed -i 's/$OLD/$NEW/g' '$FACTIONWARFARECONFIG'"
+			as_user "sed '/$SOURCE/d' '$SPAWNBEACONLISTFILE'"
+			#OLD="$(grep "FUNCTIONALBEACONS=" "$FACTIONWARFARECONFIG")"
+			#NEW="${OLD/ $SOURCE / }"
+			#as_user "sed -i 's/$OLD/$NEW/g' '$FACTIONWARFARECONFIG'"
 			case "$BCFUNCTION" in
 				*"Scanner"*)
 					echo "Beacon says: \"Do a scan for me!\""
@@ -402,9 +405,8 @@ fi
 }
 
 pl_fwf_reload_checkpoints() {
-FUNCTIONALBEACONS=$(grep "FUNCTIONALBEACONS=" $FACTIONWARFARECONFIG)
-FUNCTIONALBEACONS=${FUNCTIONALBEACONS/"FUNCTIONALBEACONS=("}
-FUNCTIONALBEACONS=${FUNCTIONALBEACONS/ )}
+FUNCTIONALBEACONS=($(grep CB_ "$SPAWNBEACONLISTFILE"))
+FUNCTIONALBEACONS=" ${FUNCTIONALBEACONS[@]} "
 CHECKPOINTS=$(grep "CHECKPOINTS=" $FACTIONWARFARECONFIG)
 CHECKPOINTS=${CHECKPOINTS/"CHECKPOINTS=("}
 CHECKPOINTS=${CHECKPOINTS/ )}
@@ -434,17 +436,13 @@ sm_spawn_round() {
 # FUNCTION = f.e. Scanner
 # _
 # NAME = GENERATEDPREFIX(GN_) POSITION(2_2_2) Nr/Name(_ABC or _1) RANDOMNUMMER(_12857) to prevent abuse
-SPAWNLIST=$(grep "GN_" $SPAWNBEACONLISTFILE)
 pl_fwf_reload_checkpoints
-OLD="$(grep "FUNCTIONALBEACONS=" "$FACTIONWARFARECONFIG")"
-NEW=$OLD
-for spawn in $SPAWNLIST; do
+for spawn in ${FIXEDBEACONSPAWNS[@]}; do
 	if [[ " $FUNCTIONALBEACONS " =~ "_${spawn}_" ]]
 	then
 		continue
 	fi
 	POS=${spawn/GN_}
-	#POS=${POS%_*}
 	POS=(${POS//_/ })
 	POS="${POS[0]} ${POS[1]} ${POS[2]}"
 	sm_get_rnd_beacon_fn
@@ -454,17 +452,37 @@ for spawn in $SPAWNLIST; do
 	fi
 	ENTITY="CB_${RNDFUNCTION}_${spawn}_$RANDOM"
 
-	NEW="${NEW:0: -1}"
-	NEW="$NEW$ENTITY )"
+	as_user "echo '$ENTITY' >> '$SPAWNBEACONLISTFILE'"
 
 	BP="${DEFAULTBEACONBP}_$RNDFUNCTION"
 	echo "$BP $ENTITY $POS"
 	as_user "screen -p 0 -S $SCREENID -X stuff $'/spawn_entity $BP $ENTITY $POS -2 false\n'"
 done
-#RNDX=$(( $RANDOM % 129 - 64 ))
-#RNDY=$(( $RANDOM % 129 - 64 ))
-#RNDZ=$(( $RANDOM % 129 - 64 ))
-as_user "sed -i 's/$OLD/$NEW/g' '$FACTIONWARFARECONFIG'"
+if [ $MAXRANDOMBEACONS -gt 0 ]
+then
+	ACTBEACONAMOUNT=$(grep -c CB_ "$SPAWNBEACONLISTFILE")
+	if [ -n "$ACTBEACONAMOUNT" ] && [ $ACTBEACONAMOUNT -ge $MAXRANDOMBEACONS ]
+	then
+		beacon=$(grep -m 1 CB_ "$SPAWNBEACONLISTFILE")
+		as_user "screen -p 0 -S $SCREENID -X stuff $'/despawn_all $beacon all true\n'"
+		as_user "sed '/$beacon/d' '$SPAWNBEACONLISTFILE'"
+	fi
+
+	sm_get_rnd_beacon_fn
+	if [ "$RNDFUNCTION" == "None" ]
+	then
+		return
+	fi
+	MODULO=$(($RANDOMSPAWNAREA * 2 +1))
+	RNDX=$(( $RANDOM % $MODULO - $RANDOMSPAWNAREA ))
+	RNDY=$(( $RANDOM % $MODULO - $RANDOMSPAWNAREA ))
+	RNDZ=$(( $RANDOM % $MODULO - $RANDOMSPAWNAREA ))
+	ENTITY="CB_${RNDFUNCTION}_${RNDX}_${RNDY}_${RNDZ}_$RANDOM"
+	as_user "echo '$ENTITY' >> '$SPAWNBEACONLISTFILE'"
+	BP="${DEFAULTBEACONBP}_$RNDFUNCTION"
+	echo "spawning beacon $ENTITY with blueprint $BP"
+	as_user "screen -p 0 -S $SCREENID -X stuff $'/spawn_entity $BP $ENTITY $RNDX $RNDY $RNDZ -2 false\n'"
+fi
 }
 
 #Chat commands:
@@ -608,10 +626,11 @@ else
 	pl_fwf_reload_checkpoints
 	if [[ ! " $FUNCTIONALBEACONS " =~ " $NAME " ]]
 	then
-		OLD="$(grep "FUNCTIONALBEACONS=" "$FACTIONWARFARECONFIG")"
-		NEW="${OLD:0: -1}"
-		NEW="$NEW$NAME )"
-		as_user "sed -i 's/$OLD/$NEW/g' '$FACTIONWARFARECONFIG'"
+		#OLD="$(grep "FUNCTIONALBEACONS=" "$FACTIONWARFARECONFIG")"
+		#NEW="${OLD:0: -1}"
+		#NEW="$NEW$NAME )"
+		#as_user "sed -i 's/$OLD/$NEW/g' '$FACTIONWARFARECONFIG'"
+		as_user "echo '$NAME' >> '$SPAWNBEACONLISTFILE'"
 		LOCATION="$(grep "PlayerLocation=" "$PLAYERFILE/$1")"
 		LOCATION=${LOCATION/*=}
 		LOCATION="${LOCATION//,/ }"
@@ -642,11 +661,12 @@ else
 	NAME=${2//CB_}
 #Now set prefix
 	NAME="CB_$NAME"
-	OLD="$(grep "FUNCTIONALBEACONS=" "$FACTIONWARFARECONFIG")"
-	NEW="${OLD/ $NAME / }"
-	if [ "$OLD" != "$NEW" ]
+	#OLD="$(grep "FUNCTIONALBEACONS=" "$FACTIONWARFARECONFIG")"
+	#NEW="${OLD/ $NAME / }"
+	OLD="$(grep "$NAME" "$SPAWNBEACONLISTFILE")"
+	if [ -n "$OLD" ]
 	then
-		as_user "sed -i 's/$OLD/$NEW/g' '$FACTIONWARFARECONFIG'"
+		as_user "sed '/$NAME/d' '$SPAWNBEACONLISTFILE'"
 		as_user "screen -p 0 -S $SCREENID -X stuff $'/pm $1 Deleted beacon from list.\n'"
 	else
 		as_user "screen -p 0 -S $SCREENID -X stuff $'/pm $1 Beacon $2 not found in list.\n'"
@@ -667,7 +687,8 @@ else
 		#as_user "screen -p 0 -S $SCREENID -X stuff $'/destroy_uid ENTITY_SHIP_$beacon\n'"
 		as_user "screen -p 0 -S $SCREENID -X stuff $'/despawn_all $beacon all true\n'"
 	done
-	as_user "sed -i 's/FUNCTIONALBEACONS=.*/FUNCTIONALBEACONS=( )/g' '$FACTIONWARFARECONFIG'"
+	as_user "sed '/CB_.*/d' '$SPAWNBEACONLISTFILE'"
+	#as_user "sed -i 's/FUNCTIONALBEACONS=.*/FUNCTIONALBEACONS=( )/g' '$FACTIONWARFARECONFIG'"
 	as_user "screen -p 0 -S $SCREENID -X stuff $'/pm $1 Cleaned up the mess. The whole beaconlist got deleted and all matching entities got destroyed\n'"
 fi
 }

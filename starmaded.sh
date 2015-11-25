@@ -1064,11 +1064,6 @@ else
 	CONTROLLED=${CONTROLLED/(*}
 	CONTROLLED=${CONTROLLED/\]*}
 fi
-if [ "$SOURCE" == "Ship" ]
-then
-	CONTROLLED=${CONTROLLED/ENTITY_SHIP_}
-	CONTROLLED=ENTITY_SHIP_$CONTROLLED
-fi
 as_user "sed -i 's/PlayerControllingType=.*/PlayerControllingType=$SOURCE/g' '$PLAYERFILE/$PLAYER'"
 as_user "sed -i 's/PlayerControllingObject=.*/PlayerControllingObject=$CONTROLLED/g' '$PLAYERFILE/$PLAYER'"
 TIMESTAMP=$(date +%s)

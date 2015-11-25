@@ -102,8 +102,8 @@ KILLERFACTION=0
 TIMESTAMP=$(date +%s)
 case "$SOURCETYP" in
 	*"Ship"*)
-		KILLERNAME=${KILLERNAME/ENTITY_SHIP_}
-		KILLERNAME="ENTITY_SHIP_$KILLERNAME"
+		#KILLERNAME=${KILLERNAME/ENTITY_SHIP_}
+		#KILLERNAME="ENTITY_SHIP_$KILLERNAME"
 		echo "$KILLEDPLAYER of faction $KILLEDFACTION got killed by a $SOURCETYP named $KILLERNAME"
 		CONTROLLERS=($(grep "PlayerControllingObject=$KILLERNAME" "$PLAYERFILE"/*))
 		CPLAYER="None"
@@ -121,7 +121,7 @@ case "$SOURCETYP" in
 		done
 		if [ "$CPLAYER" == "None" ]
 		then
-			as_user "screen -p 0 -S $SCREENID -X stuff $'/ship_info_uid \"$KILLERNAME\"\n'"
+			as_user "screen -p 0 -S $SCREENID -X stuff $'/ship_info_name \"$KILLERNAME\"\n'"
 			sleep 1
 #[SERVER-LOCAL-ADMIN] DatabaseEntry [uid=ENTITY_SHIP_Station_Piratestation Gamma_8_5_5_144596482932710, sectorPos=(8, 5, 5), type=5, seed=0, lastModifier=, spawner=<system>, realName=Station_Piratestation Gamma_8_5_5_144596482932710, touched=true, faction=-1, pos=(0.0, -28.5, 101.0), minPos=(-1, -1, -1), maxPos=(1, 1, 1), creatorID=0]
 # --------------- If not found serach for something like this -------------
