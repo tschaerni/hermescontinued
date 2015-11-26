@@ -16,3 +16,4 @@ HANDLING Entity REQUEST: PE
 \[CONTROLLER\]\[ADD-UNIT\]
 \[SERVER\] CONSTRUCTION FINISHED: SPAWNING:
 \[DOCKING\] docking failed (docking not executed):
+\[SERVER-LOCAL-ADMIN\] \[PL\]

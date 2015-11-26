@@ -77,6 +77,11 @@ then
 	echo "No oldlogs directory detected creating for logging"
 	as_user "mkdir $STARTERPATH/oldlogs"
 fi
+if [ ! -d "/dev/shm/states" ]
+then
+	as_user "mkdir /dev/shm/states"
+fi
+
 }
 sm_load_plugins() {
 if [ "$PLUGINSLOADED" == "false" ]
@@ -504,6 +509,7 @@ as_user "echo 'Server started at $DATESTR' >> $LOGPLAYERCREDIT"
 		SEARCHADDCONTROLLER="[CONTROLLER][ADD-UNIT]"
 		SEARCHSHIPYARDSPAWN="[SERVER] CONSTRUCTION FINISHED: SPAWNING:"
 		SEARCHOLDDOCKING="[DOCKING] docking failed (docking not executed):"
+		SEARCHPLAYERINFO="[SERVER-LOCAL-ADMIN] [PL] Name: "
 # Linenumber is set to zero and the a while loop runs through every present array in Linestring
 		LINENUMBER=0
 		while [ -n "${LINESTRING[$LINENUMBER]+set}" ]
@@ -560,6 +566,9 @@ as_user "echo 'Server started at $DATESTR' >> $LOGPLAYERCREDIT"
 				;;
 			*"$SEARCHOLDDOCKING"*)
 				log_olddocking $CURRENTSTRING &
+				;;
+			*"$SEARCHPLAYERINFO"*)
+				log_playerinfo_ready $CURRENTSTRING &
 				;;
 			*"$SEARCHFACTIONTURN"*)
 				check_all &
@@ -699,99 +708,127 @@ log_playerinfo() {
 #Checks if the player has a mailbox file
 #echo "$1 is the player name"
 create_playerfile $1
+#if info-state exists and is older than 2 seconds, simply delete it
+#if info-state exists and is newer, wait until it is deleted or delete as soon as it is older than 2 seconds
+TIMESTAMP=$(date +%s)
+while [ -e "/dev/shm/states/PL_$1" ]; do
+	echo "DEBUG: there was a state $1"
+	TIME=$(grep time= "/dev/shm/states/PL_$1")
+	TIME=${TIME/time=}
+	TIME=$(($TIMESTAMP - $TIME))
+	if [ "$TIME" -gt 2 ]
+	then
+		rm "/dev/shm/states/$1"
+		echo "DEBUG: forced delete state $1"
+	fi
+	sleep 1
+	((TIMESTAMP++))
+done
+
 as_user "screen -p 0 -S $SCREENID -X stuff $'/player_info $1\n'"
-sleep 2
+CNT=0
+#Wait until the player_info is complete
+while [ ! -e "/dev/shm/states/PL_$1" ]; do
+	if [ $CNT -gt 25 ]
+	then
+		PCREDITS=0
+		echo "ERROR while getting player_info: Timeout!"
+		return
+	fi
+	sleep 0.1
+	((CNT++))
+done
+echo "DEBUG: state $1 took ${CNT}00 ms"
+rm "/dev/shm/states/PL_$1"
 PCREDITS=0
-if tac /dev/shm/output.log | grep -m 1 -A 10 "Name: $1" >/dev/null
-then
-	extra_newlines=0
-	OLD_IFS=$IFS
-	IFS=$'\n'
+#if tac /dev/shm/output.log | grep -m 1 -A 10 "Name: $1" >/dev/null
+extra_newlines=0
+OLD_IFS=$IFS
+IFS=$'\n'
 #echo "Player info $1 found"
-	PLAYERINFO=( $(tac /dev/shm/output.log | grep -m 1 -A 15 "Name: $1") )
-	IFS=$OLD_IFS
-	PNAME=${PLAYERINFO[0]/*Name: }
-	PNAME=${PNAME// }
+PLAYERINFO=( $(tac $LOGFILE | grep -m 1 -A 15 "Name: $1") )
+IFS=$OLD_IFS
+PNAME=${PLAYERINFO[0]/*Name: }
+PNAME=${PNAME// }
 #echo "Player name is $PNAME"
-	SMNAME=${PLAYERINFO[2]/*SM-NAME: }
+SMNAME=${PLAYERINFO[2]/*SM-NAME: }
 #echo "StarMade-Registry name is $SMNAME"
-	PIP=$(echo ${PLAYERINFO[1]} | cut -d\/ -f2)
+PIP=$(echo ${PLAYERINFO[1]} | cut -d\/ -f2)
 #echo "Player IP is $PIP"
-	PCREDITS=${PLAYERINFO[4]/*CREDITS: }
-	PCREDITS=${PCREDITS// }
+PCREDITS=${PLAYERINFO[4]/*CREDITS: }
+PCREDITS=${PCREDITS// }
 #echo "Credits are $PCREDITS"
 #Faction descriptions may have newlines, so we have to check for them here
-	while [[ ${PLAYERINFO[5+$extra_newlines]} != *"[SERVER-LOCAL-ADMIN] [PL]"* ]] && [ $extra_newlines -lt 10 ]
-	do
-		((extra_newlines++))
-	done
+while [[ ${PLAYERINFO[5+$extra_newlines]} != *"[SERVER-LOCAL-ADMIN] [PL]"* ]] && [ $extra_newlines -lt 10 ]
+do
+	((extra_newlines++))
+done
 
-	if [ $extra_newlines -lt 9 ]
+if [ $extra_newlines -lt 9 ]
+then
+	PFACTION=${PLAYERINFO[5+$extra_newlines]//*FACTION: }
+	PFACTION=${PFACTION/*id=}
+	PFACTION=${PFACTION//,*}
+	if [ "$PFACTION" == "null" ] || [ "$PFACTION" == "0" ]
 	then
-		PFACTION=${PLAYERINFO[5+$extra_newlines]//*FACTION: }
-		PFACTION=${PFACTION/*id=}
-		PFACTION=${PFACTION//,*}
-		if [ "$PFACTION" == "null" ] || [ "$PFACTION" == "0" ]
-		then
-			PFACTION="None"
-		fi
-#echo "Faction id is $PFACTION"
-		PSECTOR=$(echo ${PLAYERINFO[6+$extra_newlines]} | cut -d\( -f2 | cut -d\) -f1 | tr -d ' ')
-#echo "Player sector is $PSECTOR"
-		if echo ${PLAYERINFO[7+$extra_newlines]} | grep SHIP >/dev/null
-		then
-			PCONTROLOBJECT=$(echo ${PLAYERINFO[7+$extra_newlines]} | cut -d: -f2 | cut -d" " -f2 | cut -d\[ -f1)
-#		echo "Player controlled object is $PCONTROLOBJECT"
-			PCONTROLTYPE=$(echo ${PLAYERINFO[7+$extra_newlines]} | cut -d: -f2- | cut -d[ -f2 | cut -d] -f1)
-#		echo "Player controlled entity type $PCONTROLTYPE"
-		fi
-		if echo ${PLAYERINFO[7+$extra_newlines]} | grep PLAYERCHARACTER >/dev/null
-		then
-			PCONTROLOBJECT=$(echo ${PLAYERINFO[7+$extra_newlines]} | cut -d: -f2 | cut -d" " -f2 | cut -d[ -f1)
-#		echo "Player controlled object is $PCONTROLOBJECT"
-			PCONTROLTYPE=Spacesuit
-#		echo "Player controlled entity type $PCONTROLTYPE"
-		fi
-	else
-#The Faction Description destroyed the PlayerInfo, use defaultvalues
-		echo "Got malformated playerinfo for player $1"
 		PFACTION="None"
-		PSECTOR="0,0,0"
-		PCONTROLTYPE="Spacesuit"
 	fi
-	PLASTUPDATE=$(date +%s)
-
-	OLDCREDITS=$(grep CurrentCredits= $PLAYERFILE/$1)
-	OLDCREDITS=${OLDCREDITS/*=}
-	if [ $OLDCREDITS -ne $PCREDITS ]
+#echo "Faction id is $PFACTION"
+	PSECTOR=$(echo ${PLAYERINFO[6+$extra_newlines]} | cut -d\( -f2 | cut -d\) -f1 | tr -d ' ')
+#echo "Player sector is $PSECTOR"
+	if echo ${PLAYERINFO[7+$extra_newlines]} | grep SHIP >/dev/null
 	then
-	#Known credits doesn't match actual credits. The difference is loss through stationspawns and trade with shops
-		as_user "echo 'time=$PLASTUPDATE player=$1 CreditExpected=$OLDCREDITS CurrentCredits=$PCREDITS' >> $BANKLOG"
-		ACD=$(grep "ActualCreditDifference_Inventory=" $CREDITSTATUSFILE)
-		ACD=${ACD/ActualCreditDifference_Inventory=}
-		ACD=$(($ACD + $PCREDITS - $OLDCREDITS))
-		as_user "sed -i 's/ActualCreditDifference_Inventory=.*/ActualCreditDifference_Inventory=$ACD/g' $CREDITSTATUSFILE"
-		ACD=$(grep "CreditDifference=" $PLAYERFILE/$1)
-		ACD=${ACD/CreditDifference=}
-		ACD=$(($ACD + $PCREDITS - $OLDCREDITS))
-		as_user "sed -i 's/CreditDifference=.*/CreditDifference=$ACD/g' $PLAYERFILE/$1"
+		PCONTROLOBJECT=$(echo ${PLAYERINFO[7+$extra_newlines]} | cut -d: -f2 | cut -d" " -f2 | cut -d\[ -f1)
+#		echo "Player controlled object is $PCONTROLOBJECT"
+		PCONTROLTYPE=$(echo ${PLAYERINFO[7+$extra_newlines]} | cut -d: -f2- | cut -d[ -f2 | cut -d] -f1)
+#		echo "Player controlled entity type $PCONTROLTYPE"
 	fi
+	if echo ${PLAYERINFO[7+$extra_newlines]} | grep PLAYERCHARACTER >/dev/null
+	then
+		PCONTROLOBJECT=$(echo ${PLAYERINFO[7+$extra_newlines]} | cut -d: -f2 | cut -d" " -f2 | cut -d[ -f1)
+#		echo "Player controlled object is $PCONTROLOBJECT"
+		PCONTROLTYPE=Spacesuit
+#		echo "Player controlled entity type $PCONTROLTYPE"
+	fi
+else
+#The Faction Description destroyed the PlayerInfo, use defaultvalues
+	echo "Got malformated playerinfo for player $1"
+	PFACTION="None"
+	PSECTOR="0,0,0"
+	PCONTROLTYPE="Spacesuit"
+fi
+PLASTUPDATE=$(date +%s)
+
+OLDCREDITS=$(grep CurrentCredits= $PLAYERFILE/$1)
+OLDCREDITS=${OLDCREDITS/*=}
+if [ $OLDCREDITS -ne $PCREDITS ]
+then
+#Known credits doesn't match actual credits. The difference is loss through stationspawns and trade with shops
+	as_user "echo 'time=$PLASTUPDATE player=$1 CreditExpected=$OLDCREDITS CurrentCredits=$PCREDITS' >> $BANKLOG"
+	ACD=$(grep "ActualCreditDifference_Inventory=" $CREDITSTATUSFILE)
+	ACD=${ACD/ActualCreditDifference_Inventory=}
+	ACD=$(($ACD + $PCREDITS - $OLDCREDITS))
+	as_user "sed -i 's/ActualCreditDifference_Inventory=.*/ActualCreditDifference_Inventory=$ACD/g' $CREDITSTATUSFILE"
+	ACD=$(grep "CreditDifference=" $PLAYERFILE/$1)
+	ACD=${ACD/CreditDifference=}
+	ACD=$(($ACD + $PCREDITS - $OLDCREDITS))
+	as_user "sed -i 's/CreditDifference=.*/CreditDifference=$ACD/g' $PLAYERFILE/$1"
+fi
 
 #echo "Player file last update is $PLASTUPDATE"
-	as_user "sed -i 's/SMName=.*/SMName=$SMNAME/g' $PLAYERFILE/$1"
-	as_user "sed -i 's/CurrentIP=.*/CurrentIP=$PIP/g' $PLAYERFILE/$1"
-	as_user "sed -i 's/CurrentCredits=.*/CurrentCredits=$PCREDITS/g' $PLAYERFILE/$1"
-	as_user "sed -i 's/PlayerFaction=.*/PlayerFaction=$PFACTION/g' $PLAYERFILE/$1"
-	as_user "sed -i 's/PlayerLocation=.*/PlayerLocation=$PSECTOR/g' $PLAYERFILE/$1"
+as_user "sed -i 's/SMName=.*/SMName=$SMNAME/g' $PLAYERFILE/$1"
+as_user "sed -i 's/CurrentIP=.*/CurrentIP=$PIP/g' $PLAYERFILE/$1"
+as_user "sed -i 's/CurrentCredits=.*/CurrentCredits=$PCREDITS/g' $PLAYERFILE/$1"
+as_user "sed -i 's/PlayerFaction=.*/PlayerFaction=$PFACTION/g' $PLAYERFILE/$1"
+as_user "sed -i 's/PlayerLocation=.*/PlayerLocation=$PSECTOR/g' $PLAYERFILE/$1"
 #	as_user "sed -i 's/PlayerControllingType=.*/PlayerControllingType=$PCONTROLTYPE/g' $PLAYERFILE/$1"
 #	as_user "sed -i 's/PlayerControllingObject=.*/PlayerControllingObject=$PCONTROLOBJECT/g' $PLAYERFILE/$1"
-	as_user "sed -i 's/PlayerLastUpdate=.*/PlayerLastUpdate=$PLASTUPDATE/g' $PLAYERFILE/$1"
-	as_user "sed -i 's/PlayerLoggedIn=.*/PlayerLoggedIn=Yes/g' $PLAYERFILE/$1"
-	if [ "$PFACTION" != "None" ]
-	then
-		create_factionfile $PFACTION
-		as_user "sed -i 's/FactionLastUpdate=.*/FactionLastUpdate=$PLASTUPDATE/g' $FACTIONFILE/$PFACTION"
-	fi
+as_user "sed -i 's/PlayerLastUpdate=.*/PlayerLastUpdate=$PLASTUPDATE/g' $PLAYERFILE/$1"
+as_user "sed -i 's/PlayerLoggedIn=.*/PlayerLoggedIn=Yes/g' $PLAYERFILE/$1"
+if [ "$PFACTION" != "None" ]
+then
+	create_factionfile $PFACTION
+	as_user "sed -i 's/FactionLastUpdate=.*/FactionLastUpdate=$PLASTUPDATE/g' $FACTIONFILE/$PFACTION"
 fi
 }
 log_chatlogging() {
@@ -918,7 +955,10 @@ then
 fi
 }
 log_playerlogout() {
-LOGOUTPLAYER=$(echo $@ | cut -d: -f2 | cut -d\( -f1 | tr -d ' ')
+LOGOUTPLAYER="$@"
+LOGOUTPLAYER=${LOGOUTPLAYER/*RegisteredClient: }
+LOGOUTPLAYER=${LOGOUTPLAYER// *}
+#LOGOUTPLAYER=$(echo $@ | cut -d: -f2 | cut -d\( -f1 | tr -d ' ')
 #echo "$LOGOUTPLAYER passed to playerlogout"
 
 if [ -e $PLAYERFILE/$LOGOUTPLAYER ]
@@ -1074,7 +1114,15 @@ log_shipyardspawn() {
 SHIP="$@"
 SHIP=${SHIP/*SPAWNING: }
 TIMESTAMP=$(date +%s)
+sleep 1
+as_user "screen -p 0 -S $SCREENID -X stuff $'/ship_info_uid \"${SHIP}0\"\n'"
+sleep 1
+ENTITYINFO=$(tac /dev/shm/output.log | grep -m 1 "\[SERVER-LOCAL-ADMIN\] DatabaseEntry \[uid=${SHIP}0, ")
 as_user "echo 'time=$TIMESTAMP ship=${SHIP}0 mass=0 fid=0 sector=0,0,0'>> '$SHIPYARDLOG'"
+if [ -n "$ENTITYINFO" ]
+then
+	as_user "echo '$ENTITYINFO' >> '$SHIPYARDLOG'"
+fi
 }
 
 log_olddocking() {
@@ -1085,6 +1133,13 @@ sleep 1
 as_user "screen -p 0 -S $SCREENID -X stuff $'/destroy_uid_docked \"ENTITY_SHIP_$SHIP\"\n'"
 TIMESTAMP=$(date +%s)
 as_user "echo 'time=$TIMESTAMP destroying old docking ship=$SHIP'>> '$SHIPYARDLOG'"
+}
+
+log_playerinfo_ready() {
+TMP="$@"
+PLAYER=${TMP//*Name: }
+TIMESTAMP=$(date +%s)
+as_user "echo time=$TIMESTAMP > /dev/shm/states/PL_$PLAYER"
 }
 #------------------------------Game mechanics-----------------------------------------
 
@@ -1952,20 +2007,21 @@ function COMMAND_DEPOSIT(){
 #			echo "Adjusted time to remove 10 seconds $ADJUSTEDTIME"
 			if [ "$OLDTIME" -ge "$ADJUSTEDTIME" ]
 			then
-				BALANCECREDITS=$(grep CreditsInBank $PLAYERFILE/$1 | cut -d= -f2- |  tr -d ' ')
+				BALANCECREDITS=$(grep CreditsInBank= $PLAYERFILE/$1)
+				BALANCECREDITS=${BALANCECREDITS/CreditsInBank=}
 #				echo $BALANCECREDITS
-				CREDITSTOTAL=$(grep CurrentCredits $PLAYERFILE/$1 | cut -d= -f2- |  tr -d ' ')
+				#CREDITSTOTAL=$(grep CurrentCredits $PLAYERFILE/$1 | cut -d= -f2- |  tr -d ' ')
 #				echo "Credits in log $CREDITTOTAL"
 #				echo "Total credits are $CREDITSTOTAL on person and $BALANCECREDITS in bank"
 #				echo "Credits to be deposited $2 "
-				if [ "$CREDITSTOTAL" -ge "$2" ]
+				if [ "$PCREDITS" -ge "$2" ]
 				then
 #					echo "enough money detected"
 					BANKTAX=$(( $2 * $DEPOSITBANKFEE / 100 ))
 					NEWBALANCE=$(( $2 + $BALANCECREDITS - $BANKTAX ))
-					NEWCREDITS=$(( $CREDITSTOTAL - $2 ))
+					NEWCREDITS=$(( $PCREDITS - $2 ))
 #					echo "new bank balance is $NEWBALANCE"
-					as_user "sed -i 's/CurrentCredits=$CREDITSTOTAL/CurrentCredits=$NEWCREDITS/g' $PLAYERFILE/$1"
+					as_user "sed -i 's/CurrentCredits=$PCREDITS/CurrentCredits=$NEWCREDITS/g' $PLAYERFILE/$1"
 					as_user "sed -i 's/CreditsInBank=$BALANCECREDITS/CreditsInBank=$NEWBALANCE/g' $PLAYERFILE/$1"
 					#					as_user "sed -i '4s/.*/CreditsInBank=$NEWBALANCE/g' $PLAYERFILE/$1"
 					as_user "screen -p 0 -S $SCREENID -X stuff $'/give_credits $1 -$2\n'"
