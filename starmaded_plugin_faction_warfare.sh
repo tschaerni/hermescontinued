@@ -321,7 +321,7 @@ then
 
 #delete beacon from list and delete entity. Do this before any other action to reduce the possibility of abuse. (F.e. use by two players simultaneously)
 			as_user "screen -p 0 -S $SCREENID -X stuff $'/destroy_uid ENTITY_SHIP_$SOURCE\n'"
-			as_user "sed '/$SOURCE/d' '$SPAWNBEACONLISTFILE'"
+			as_user "sed  -i '/$SOURCE/d' '$SPAWNBEACONLISTFILE'"
 			#OLD="$(grep "FUNCTIONALBEACONS=" "$FACTIONWARFARECONFIG")"
 			#NEW="${OLD/ $SOURCE / }"
 			#as_user "sed -i 's/$OLD/$NEW/g' '$FACTIONWARFARECONFIG'"
@@ -465,7 +465,7 @@ then
 	then
 		beacon=$(grep -m 1 CB_ "$SPAWNBEACONLISTFILE")
 		as_user "screen -p 0 -S $SCREENID -X stuff $'/despawn_all $beacon all true\n'"
-		as_user "sed '/$beacon/d' '$SPAWNBEACONLISTFILE'"
+		as_user "sed  -i '/$beacon/d' '$SPAWNBEACONLISTFILE'"
 	fi
 
 	sm_get_rnd_beacon_fn
@@ -666,7 +666,7 @@ else
 	OLD="$(grep "$NAME" "$SPAWNBEACONLISTFILE")"
 	if [ -n "$OLD" ]
 	then
-		as_user "sed '/$NAME/d' '$SPAWNBEACONLISTFILE'"
+		as_user "sed  -i '/$NAME/d' '$SPAWNBEACONLISTFILE'"
 		as_user "screen -p 0 -S $SCREENID -X stuff $'/pm $1 Deleted beacon from list.\n'"
 	else
 		as_user "screen -p 0 -S $SCREENID -X stuff $'/pm $1 Beacon $2 not found in list.\n'"
@@ -687,7 +687,7 @@ else
 		#as_user "screen -p 0 -S $SCREENID -X stuff $'/destroy_uid ENTITY_SHIP_$beacon\n'"
 		as_user "screen -p 0 -S $SCREENID -X stuff $'/despawn_all $beacon all true\n'"
 	done
-	as_user "sed '/CB_.*/d' '$SPAWNBEACONLISTFILE'"
+	as_user "sed  -i '/CB_.*/d' '$SPAWNBEACONLISTFILE'"
 	#as_user "sed -i 's/FUNCTIONALBEACONS=.*/FUNCTIONALBEACONS=( )/g' '$FACTIONWARFARECONFIG'"
 	as_user "screen -p 0 -S $SCREENID -X stuff $'/pm $1 Cleaned up the mess. The whole beaconlist got deleted and all matching entities got destroyed\n'"
 fi
