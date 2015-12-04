@@ -738,7 +738,7 @@ while [ ! -e "/dev/shm/states/PL_$1" ]; do
 	sleep 0.1
 	((CNT++))
 done
-echo "DEBUG: state $1 took ${CNT}00 ms"
+#echo "DEBUG: state $1 took ${CNT}00 ms"
 rm "/dev/shm/states/PL_$1"
 PCREDITS=0
 #if tac /dev/shm/output.log | grep -m 1 -A 10 "Name: $1" >/dev/null
@@ -1619,7 +1619,7 @@ sleep 2
 for i in $FACTIONFILE/*
 do
 	FID=${i//*"/"}
-	if [ $FID -gt 0 ]
+	if [ $FID -gt 10001 ] # 0
 	then
 		update_faction_info $FID "no"
 		LASTACTIVITY=$(grep "FactionLastUpdate=" "$i")
