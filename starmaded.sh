@@ -2661,8 +2661,8 @@ function COMMAND_THREADDUMP(){
 }
 
 function COMMAND_REFILLCREDITS(){
-#A debug tool that outputs what the server is doing to a file
-#USAGE: !THREADDUMP
+#Gives an admin credits to refill a shop and adds the amount to the creditstatistic
+#USAGE: !REFILLCREDITS <nr>
 	if [ "$#" -ne "2" ]
 	then
 		as_user "screen -p 0 -S $SCREENID -X stuff $'/pm $1 Invalid parameters. Please use !REFILLCREDITS <amount>\n'"
@@ -2680,6 +2680,13 @@ function COMMAND_REFILLCREDITS(){
 		as_user "screen -p 0 -S $SCREENID -X stuff $'/give_credits $1 $2\n'"
 		as_user "screen -p 0 -S $SCREENID -X stuff $'/pm $1 You got $2 credits to refill shop, also set refilled amount for today to $refilled\n'"
 	fi
+}
+
+function COMMAND_RESTART(){
+#Gives an admin the power to force a server restart from within the game
+#USAGE: !RESTART
+	echo "Executing command !RESTART by $1"
+	as_user "$STARTERPATH/starmaded.sh restart" &
 }
 
 #------------------------------Start of daemon script-----------------------------------------
